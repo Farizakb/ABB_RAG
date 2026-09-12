@@ -1,0 +1,49 @@
+# --- Planning and process. Internal to Fariz, not part of the ABB deliverable. ---
+# Untracked, not deleted: the fresh implementation session still reads these off disk.
+archive/
+docs/superpowers/
+INDEX.md
+SPEC.md
+SPEC_v*.md
+RECON.md
+CUT_LIST.md
+ABB_DS_SW_CASE_STUDY.docx
+
+# NOTE: docs/ itself is deliberately NOT ignored. docs/adr/, docs/error-analysis.md
+# and docs/demo-script.md are graded deliverables under SPEC §19 and must ship.
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Crawl cache: regenerable, large, and ABB's content. Never committed. ---
+data/
+
+# NOTE: fixtures/ IS tracked. fixtures/raw/*.html are the gate-captured pages every
+# extraction test asserts against, and fixtures/corpus_sample.json is what lets a
+# reviewer run the app without crawling ABB's production site (SPEC §12).
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- Node ---
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# --- Editors and OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
