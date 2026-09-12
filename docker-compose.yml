@@ -1,0 +1,24 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment: { POSTGRES_USER: abb, POSTGRES_PASSWORD: abb, POSTGRES_DB: abb, EMBEDDING_DIM: "${EMBEDDING_DIM}" }
+    volumes: ["pgdata:/var/lib/postgresql/data", "./db/migrations:/migrations:ro", "./db/init:/docker-entrypoint-initdb.d:ro"]
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U abb"], interval: 5s, retries: 10 }
+  rag:
+    build: { context: ., dockerfile: services/rag/Dockerfile }
+    env_file: [.env]
+    depends_on: { db: { condition: service_healthy } }
+    healthcheck: { test: ["CMD", "python", "-c", "import httpx;httpx.get('http://localhost:8000/healthz').raise_for_status()"], interval: 10s, retries: 5 }
+  chat:
+    build: { context: ., dockerfile: services/chat/Dockerfile }
+    env_file: [.env]
+    depends_on: { db: { condition: service_healthy }, rag: { condition: service_started } }
+  web:
+    build: { context: ./apps/web }
+    ports: ["8080:80"]
+    depends_on: [chat, rag]
+  scraper:
+    profiles: ["scraper"]
+    build: { context: ., dockerfile: packages/scraper/Dockerfile }
+    volumes: ["./data:/app/data", "./fixtures:/app/fixtures"]
+volumes: { pgdata: }
