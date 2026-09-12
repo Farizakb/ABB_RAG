@@ -1,0 +1,5 @@
+# Pinned for scripts/verify_gate.py (Task 1, SPEC §2 verification gate).
+# Task 2 owns the workspace pyproject.toml and will extend this file with
+# the test and lint toolchain.
+httpx==0.28.1
+openai==3.13.0

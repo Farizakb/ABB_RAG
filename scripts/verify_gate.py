@@ -11,7 +11,7 @@ Deviations from the original brief, per task-1 decisions:
 - robots.txt is checked here in Python (identifying UA, one request) instead
   of via a separate curl step.
 
-Round-2 fixes (task-1 fix round 1, all inside SPEC §2's remit):
+Fix round 1 (all inside SPEC §2's remit):
 - F1: fetches one real sub-page per biznes segment (one hop below each hub,
   discovered from the hub fixture's own hrefs already on disk) and reports
   the two signals that decide Task 7's shape: a bullet-separated breadcrumb
@@ -24,21 +24,37 @@ Round-2 fixes (task-1 fix round 1, all inside SPEC §2's remit):
   never printed/logged) and runs the real V-2 model/embedding/structured-
   output probe.
 - F4: greps the already-captured fixtures for cdn.abb-bank.az PDF links and
-  probes any found (ranged GET) instead of the previous inconclusive CDN
-  root request.
+  probes any found instead of the previous inconclusive CDN root request.
+
+Fix round 2:
+- R1: every sleep is now jittered (`1.0 + random.uniform(0, 0.3)`), matching
+  SPEC §5.1's "one request per second with jitter" and the shape Task 6's
+  real Fetcher will use.
+- R2: robots.txt is now enforced, not just parsed and printed. `fetch()` is
+  gated by a `urllib.robotparser.RobotFileParser` built from the fetched
+  robots.txt; a disallowed URL is skipped (no request made) with a printed
+  line, rather than fetched anyway or silently dropped. This matters because
+  `pick_kampaniya_active()` and `first_sub_page_path()` derive URLs
+  dynamically. (The CDN PDF probe targets a different host, cdn.abb-bank.az,
+  so it is not gated by abb-bank.az's robots.txt.)
+- R3: dependencies are now pinned in requirements-dev.txt at the repo root.
+- R4: the CDN PDF probe uses client.stream() and reads only the first chunk,
+  so a server that ignores the Range header still only costs ~2 KB, not the
+  whole file.
 
 The whole script stays idempotent: fixtures already on disk are not
-re-fetched, so re-running it (e.g. once F1-F4 land, or later once V-2 needs
-re-checking) only pays for what's actually missing.
+re-fetched, so re-running it only pays for what's actually missing.
 """
 from __future__ import annotations
 
 import datetime
 import os
 import pathlib
+import random
 import re
 import sys
 import time
+import urllib.robotparser
 
 import httpx
 
@@ -84,6 +100,11 @@ MAX_CAMPAIGN_PROBES = 5  # politeness bound: don't chase every campaign URL
 PDF_URL_RE = re.compile(r"https://cdn\.abb-bank\.az/[A-Za-z0-9_./%-]+\.pdf")
 
 
+def _polite_sleep() -> None:
+    """R1: one request per second, with jitter, everywhere the script sleeps."""
+    time.sleep(1.0 + random.uniform(0, 0.3))
+
+
 def load_dotenv_key(key: str, path: pathlib.Path = ENV_FILE) -> None:
     """F3: load one key from .env into the process environment. Never
     prints or logs the value. No-op if already set, or the file/key is
@@ -100,19 +121,34 @@ def load_dotenv_key(key: str, path: pathlib.Path = ENV_FILE) -> None:
             return
 
 
-def fetch(client: httpx.Client, path: str, host: str = HOST) -> httpx.Response:
-    time.sleep(1.0)
-    return client.get(host + path, follow_redirects=True)
+def fetch(
+    client: httpx.Client,
+    path: str,
+    rp: urllib.robotparser.RobotFileParser,
+    host: str = HOST,
+) -> httpx.Response | None:
+    """R1 + R2: jittered 1 req/s sleep, gated by robots.txt. Returns None
+    (no request made) if `rp` disallows the URL for our UA."""
+    url = host + path
+    if not rp.can_fetch(UA, url):
+        return None
+    _polite_sleep()
+    return client.get(url, follow_redirects=True)
 
 
-def load_or_fetch(client: httpx.Client, name: str, path: str) -> tuple[str, str]:
+def load_or_fetch(
+    client: httpx.Client, name: str, path: str, rp: urllib.robotparser.RobotFileParser
+) -> tuple[str | None, str]:
     """Idempotent fixture fetch: reuse fixtures/raw/<name>.html if it's
     already on disk instead of re-fetching, so re-running the gate doesn't
-    re-hit pages it already has."""
+    re-hit pages it already has. Returns (None, status) if robots.txt
+    disallows the path and nothing is on disk yet."""
     file = RAW / f"{name}.html"
     if file.exists():
         return file.read_text(encoding="utf-8"), "on-disk (skipped fetch)"
-    r = fetch(client, path)
+    r = fetch(client, path, rp)
+    if r is None:
+        return None, "SKIPPED — disallowed by robots.txt"
     file.write_text(r.text, encoding="utf-8")
     return r.text, str(r.status_code)
 
@@ -153,15 +189,21 @@ def find_cdn_pdf_urls() -> list[str]:
     return sorted(urls)
 
 
-def check_robots(client: httpx.Client) -> list[str]:
-    """Step 2, done in Python per decision #4: fetch robots.txt, report
-    Crawl-delay presence and Disallow paths for User-agent: *."""
-    r = fetch(client, "/robots.txt")
+def check_robots(
+    client: httpx.Client,
+) -> tuple[list[str], urllib.robotparser.RobotFileParser]:
+    """Step 2, done in Python per decision #4: fetch robots.txt (the one
+    request nothing else can be gated behind), report Crawl-delay presence
+    and Disallow paths for the printed table, and build the
+    RobotFileParser (R2) used to gate every later request in this run."""
+    _polite_sleep()
+    r = client.get(HOST + "/robots.txt", follow_redirects=True)
     text = r.text
     lines = [ln.strip() for ln in text.splitlines()]
 
     # Walk to the "User-agent: *" block and collect its Disallow lines,
-    # stopping at the next User-agent block or EOF.
+    # stopping at the next User-agent block or EOF. (Reporting only — actual
+    # enforcement is via RobotFileParser.can_fetch below.)
     star_disallows: list[str] = []
     in_star_block = False
     for ln in lines:
@@ -188,27 +230,43 @@ def check_robots(client: httpx.Client) -> list[str]:
             "project's 1 req/s default and every scrape-time estimate "
             "downstream must be recomputed. !!!"
         )
-    return out
+
+    rp = urllib.robotparser.RobotFileParser()
+    rp.parse(text.splitlines())
+    return out, rp
 
 
 def pick_kampaniya_active(
-    client: httpx.Client, camp_sorted: list[str]
-) -> tuple[str, str, list[str]]:
+    client: httpx.Client,
+    camp_sorted: list[str],
+    rp: urllib.robotparser.RobotFileParser,
+) -> tuple[str | None, str | None, list[str]]:
     """Decision #1: pick the kampaniyalar/** URL with the most recent sitemap
     lastmod, confirm its body carries a DD.MM.YYYY - DD.MM.YYYY range whose
     end date is in the future. Falls back to the most recent one if none of
-    the probed candidates qualify.
+    the probed candidates qualify. A candidate disallowed by robots.txt is
+    skipped (reported) and does not count against the probe budget.
 
-    Returns (path, html, report_lines). `path` is host-relative.
+    Returns (path, html, report_lines). `path` is host-relative. Both may be
+    None if no candidate could be fetched at all.
     """
     today = datetime.date.today()
     out: list[str] = []
     fallback_path: str | None = None
     fallback_html: str | None = None
+    probed = 0
 
-    for i, url in enumerate(camp_sorted[:MAX_CAMPAIGN_PROBES]):
+    for url in camp_sorted:
+        if probed >= MAX_CAMPAIGN_PROBES:
+            break
         path = url if url.startswith("/") else url[len(HOST):]
-        r = fetch(client, path)
+        r = fetch(client, path, rp)
+        if r is None:
+            out.append(
+                f"V-5 kampaniya-active: skipping {path} — disallowed by robots.txt"
+            )
+            continue
+        probed += 1
         html = r.text
         if fallback_path is None:
             fallback_path = path
@@ -222,19 +280,24 @@ def pick_kampaniya_active(
                 end = None
             if end and end > today:
                 out.append(
-                    f"V-5 kampaniya-active: picked {path} (probe {i + 1}/"
-                    f"{min(MAX_CAMPAIGN_PROBES, len(camp_sorted))}), range "
+                    f"V-5 kampaniya-active: picked {path} (probe {probed}/"
+                    f"{MAX_CAMPAIGN_PROBES}), range "
                     f"{m.group(1)}-{m.group(2)}, end date is in the future."
                 )
                 return path, html, out
 
+    if fallback_path is None:
+        out.append(
+            "V-5 kampaniya-active: no campaign URL could be fetched (empty "
+            "candidate list, or every candidate disallowed by robots.txt)."
+        )
+        return None, None, out
+
     out.append(
-        f"V-5 kampaniya-active: none of the top "
-        f"{min(MAX_CAMPAIGN_PROBES, len(camp_sorted))} most-recent-lastmod "
+        f"V-5 kampaniya-active: none of the {probed} probed most-recent-lastmod "
         f"campaign URLs carried a still-future date range. Saved the most "
         f"recent one anyway: {fallback_path}"
     )
-    assert fallback_path is not None and fallback_html is not None
     return fallback_path, fallback_html, out
 
 
@@ -245,18 +308,30 @@ def main() -> int:
 
     with httpx.Client(headers={"User-Agent": UA}, timeout=30.0) as client:
         out.append("--- Step 2 (in Python): robots.txt ---")
-        out.extend(check_robots(client))
+        robots_report, rp = check_robots(client)
+        out.extend(robots_report)
 
         # V-5 + V-6: sitemap counts (always re-fetched — F2 needs a fresh
         # rolling window each run, and it's cheap: 1 request)
-        sm = fetch(client, "/sitemap.xml").text
-        urls = re.findall(r"<loc>([^<]+)</loc>", sm)
-        lastmods = dict(
-            zip(urls, re.findall(r"<lastmod>([^<]+)</lastmod>", sm), strict=False)
-        )
-        az = [u for u in urls if "/en/" not in u and "/ru/" not in u]
-        camp = [u for u in az if "/kampaniyalar/" in u]
-        camp_sorted = sorted(camp, key=lambda u: lastmods.get(u, ""), reverse=True)
+        sm_resp = fetch(client, "/sitemap.xml", rp)
+        if sm_resp is None:
+            out.append(
+                "\nV-5 / V-6: SKIPPED — /sitemap.xml disallowed by robots.txt"
+            )
+            urls: list[str] = []
+            lastmods: dict[str, str] = {}
+            az: list[str] = []
+            camp: list[str] = []
+            camp_sorted: list[str] = []
+        else:
+            sm = sm_resp.text
+            urls = re.findall(r"<loc>([^<]+)</loc>", sm)
+            lastmods = dict(
+                zip(urls, re.findall(r"<lastmod>([^<]+)</lastmod>", sm), strict=False)
+            )
+            az = [u for u in urls if "/en/" not in u and "/ru/" not in u]
+            camp = [u for u in az if "/kampaniyalar/" in u]
+            camp_sorted = sorted(camp, key=lambda u: lastmods.get(u, ""), reverse=True)
 
         # F2: true rolling 365-day window, not a calendar-year-prefix check.
         today = datetime.date.today()
@@ -289,10 +364,10 @@ def main() -> int:
         kamp_file = RAW / "kampaniya-active.html"
         kamp_already_on_disk = kamp_file.exists()
         if kamp_already_on_disk:
-            kamp_html = kamp_file.read_text(encoding="utf-8")
+            kamp_html: str | None = kamp_file.read_text(encoding="utf-8")
             out.append("V-5 kampaniya-active: fixture already on disk, skipped re-probe.")
         else:
-            _, kamp_html, kamp_report = pick_kampaniya_active(client, camp_sorted)
+            _, kamp_html, kamp_report = pick_kampaniya_active(client, camp_sorted, rp)
             out.extend(kamp_report)
 
         # Build the final 8-entry fixture set and fetch the rest (fixed pages
@@ -307,14 +382,22 @@ def main() -> int:
         rows: dict[str, str] = {}
         for name in REPORT_ORDER:
             if name == "kampaniya-active":
-                html = kamp_html
                 if kamp_already_on_disk:
+                    html: str | None = kamp_html
                     status = "on-disk (skipped fetch)"
-                else:
+                elif kamp_html is not None:
+                    html = kamp_html
                     kamp_file.write_text(html, encoding="utf-8")
                     status = "n/a (reused from probe)"
+                else:
+                    html = None
+                    status = "SKIPPED — no campaign candidate could be fetched"
             else:
-                html, status = load_or_fetch(client, name, all_pages[name])
+                html, status = load_or_fetch(client, name, all_pages[name], rp)
+
+            if html is None:
+                rows[name] = f"| {name} | {status} | - | - | - | - |"
+                continue
             rows[name] = (
                 f"| {name} | {status} | {len(html)} | "
                 f"breadcrumb-links={len(re.findall(r'<a[^>]+href=\"/[^\"]*\"', html))} | "
@@ -360,7 +443,10 @@ def main() -> int:
                     f"{base_path} in {hub_name}.html | | | | |"
                 )
                 continue
-            html, status = load_or_fetch(client, sub_name, sub_path)
+            html, status = load_or_fetch(client, sub_name, sub_path, rp)
+            if html is None:
+                out.append(f"| {sub_name} ({sub_path}) | {status} | - | - | - | - |")
+                continue
             vis = visible_text(html)
             has_bullet = "•" in vis
             has_stat = any(lbl in vis for lbl in STAT_LABELS)
@@ -372,7 +458,9 @@ def main() -> int:
             )
 
         # F4: CDN PDF probe sourced from the already-captured fixtures
-        # (superseding round 1's inconclusive CDN-root request).
+        # (superseding round 1's inconclusive CDN-root request). This targets
+        # cdn.abb-bank.az, a different host from the abb-bank.az robots.txt
+        # `rp` above was built from, so it is not gated by `rp`.
         out.append("\n--- V-3 (F4 follow-up): CDN PDF probe from fixtures ---")
         pdf_urls = find_cdn_pdf_urls()
         if not pdf_urls:
@@ -384,13 +472,19 @@ def main() -> int:
                 f"V-3: {len(pdf_urls)} distinct PDF URL(s) found across fixtures: {pdf_urls}"
             )
             for url in pdf_urls[:2]:
-                time.sleep(1.0)
-                r = client.get(url, headers={"Range": "bytes=0-2047"}, timeout=15.0)
-                ctype = r.headers.get("content-type", "?")
-                clen = r.headers.get("content-length", "?")
+                _polite_sleep()
+                # R4: stream and read only the first chunk, so a CDN that
+                # ignores Range still costs ~2 KB, not the whole file.
+                with client.stream(
+                    "GET", url, headers={"Range": "bytes=0-2047"}, timeout=15.0
+                ) as r:
+                    ctype = r.headers.get("content-type", "?")
+                    clen_header = r.headers.get("content-length", "?")
+                    chunk = next(r.iter_bytes(chunk_size=2048), b"")
                 out.append(
                     f"V-3: probe {url} -> status={r.status_code} "
-                    f"content-type={ctype} content-length={clen}"
+                    f"content-type={ctype} content-length-header={clen_header} "
+                    f"bytes-read={len(chunk)}"
                 )
 
     # V-2 (F3): now answerable — OPENAI_API_KEY loaded from .env above.
