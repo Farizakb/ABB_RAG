@@ -10,3 +10,9 @@ pre-commit==4.6.2
 
 # Task 4: packages/contracts models (rag/chat shared schema).
 pydantic==2.13.5
+
+# Task 5: packages/scraper sitemap filter (SPEC §5.2).
+# httpx is already pinned above (Task 1); reused here for fetch_sitemap's client param.
+# selectolax: fast (Lexbor-backed) HTML/XML parser used to parse sitemap.xml's <url>/
+# <loc>/<lastmod> nodes in fetch_sitemap. New dependency for this task.
+selectolax==0.4.11
