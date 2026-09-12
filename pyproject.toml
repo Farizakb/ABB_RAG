@@ -1,0 +1,23 @@
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "PTH", "RUF"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+# Only paths that exist today. services/, packages/ and evals/ are created by
+# later tasks (3-5, 24) -- each of those tasks must add its own directory back
+# into this list so it stays covered under --strict once it appears (mypy
+# errors on a nonexistent path in `files`, so it can't be listed pre-emptively).
+files = ["scripts"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+# One bare `pytest` run can't work: services/rag/app and services/chat/app are
+# both top-level package `app`. make test / CI run pytest per project instead
+# (see Makefile / .github/workflows/ci.yml), so no shared testpaths/rootdir
+# assumption is made here.
+addopts = "-q"

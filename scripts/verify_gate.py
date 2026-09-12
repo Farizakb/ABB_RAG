@@ -45,6 +45,7 @@ Fix round 2:
 The whole script stays idempotent: fixtures already on disk are not
 re-fetched, so re-running it only pays for what's actually missing.
 """
+
 from __future__ import annotations
 
 import datetime
@@ -173,7 +174,8 @@ def first_sub_page_path(hub_fixture_name: str, base_path: str) -> str | None:
     if not file.exists():
         return None
     html = file.read_text(encoding="utf-8")
-    for p in re.findall(r"/biznes/[a-z0-9-]+/[a-z0-9-]+", html):
+    matches: list[str] = re.findall(r"/biznes/[a-z0-9-]+/[a-z0-9-]+", html)
+    for p in matches:
         if p.startswith(base_path + "/"):
             return p
     return None
@@ -220,8 +222,9 @@ def check_robots(
 
     has_crawl_delay = any(re.match(r"(?i)^crawl-delay:", ln) for ln in lines)
 
+    crawl_delay_note = "YES — OVERRIDES 1 req/s, RECOMPUTE ESTIMATES" if has_crawl_delay else "none"
     out = [
-        f"robots.txt: status={r.status_code} Crawl-delay={'YES — OVERRIDES 1 req/s, RECOMPUTE ESTIMATES' if has_crawl_delay else 'none'} "
+        f"robots.txt: status={r.status_code} Crawl-delay={crawl_delay_note} "
         f"disallow-for-*={star_disallows}",
     ]
     if has_crawl_delay:
@@ -259,12 +262,10 @@ def pick_kampaniya_active(
     for url in camp_sorted:
         if probed >= MAX_CAMPAIGN_PROBES:
             break
-        path = url if url.startswith("/") else url[len(HOST):]
+        path = url if url.startswith("/") else url[len(HOST) :]
         r = fetch(client, path, rp)
         if r is None:
-            out.append(
-                f"V-5 kampaniya-active: skipping {path} — disallowed by robots.txt"
-            )
+            out.append(f"V-5 kampaniya-active: skipping {path} — disallowed by robots.txt")
             continue
         probed += 1
         html = r.text
@@ -315,9 +316,7 @@ def main() -> int:
         # rolling window each run, and it's cheap: 1 request)
         sm_resp = fetch(client, "/sitemap.xml", rp)
         if sm_resp is None:
-            out.append(
-                "\nV-5 / V-6: SKIPPED — /sitemap.xml disallowed by robots.txt"
-            )
+            out.append("\nV-5 / V-6: SKIPPED — /sitemap.xml disallowed by robots.txt")
             urls: list[str] = []
             lastmods: dict[str, str] = {}
             az: list[str] = []
@@ -326,9 +325,7 @@ def main() -> int:
         else:
             sm = sm_resp.text
             urls = re.findall(r"<loc>([^<]+)</loc>", sm)
-            lastmods = dict(
-                zip(urls, re.findall(r"<lastmod>([^<]+)</lastmod>", sm), strict=False)
-            )
+            lastmods = dict(zip(urls, re.findall(r"<lastmod>([^<]+)</lastmod>", sm), strict=False))
             az = [u for u in urls if "/en/" not in u and "/ru/" not in u]
             camp = [u for u in az if "/kampaniyalar/" in u]
             camp_sorted = sorted(camp, key=lambda u: lastmods.get(u, ""), reverse=True)
@@ -376,9 +373,7 @@ def main() -> int:
         all_pages["stub-empty"] = STUB_EMPTY_PATH
 
         out.append("\n--- V-1 / V-7: fixture shape signals ---")
-        out.append(
-            "| fixture | status | html-len | breadcrumb-links | terminus | ldjson |"
-        )
+        out.append("| fixture | status | html-len | breadcrumb-links | terminus | ldjson |")
         rows: dict[str, str] = {}
         for name in REPORT_ORDER:
             if name == "kampaniya-active":
@@ -411,7 +406,7 @@ def main() -> int:
         # address and phone?
         homepage_html = RAW.joinpath("homepage.html").read_text(encoding="utf-8")
         ldjson_blocks = re.findall(
-            r'<script[^>]+application/ld\+json[^>]*>(.*?)</script>',
+            r"<script[^>]+application/ld\+json[^>]*>(.*?)</script>",
             homepage_html,
             flags=re.DOTALL,
         )
@@ -428,9 +423,7 @@ def main() -> int:
             out.append("\nV-7: NO BankOrCreditUnion ld+json block found on homepage.")
 
         # F1: one real sub-page per biznes segment, one hop below each hub.
-        out.append(
-            "\n--- F1 (V-1 follow-up): biznes sub-pages, one hop below each hub ---"
-        )
+        out.append("\n--- F1 (V-1 follow-up): biznes sub-pages, one hop below each hub ---")
         out.append(
             "| fixture (path) | status | html-len | breadcrumb-bullet-in-visible-text | "
             "stat-block-in-visible-text | ldjson |"
@@ -464,9 +457,7 @@ def main() -> int:
         out.append("\n--- V-3 (F4 follow-up): CDN PDF probe from fixtures ---")
         pdf_urls = find_cdn_pdf_urls()
         if not pdf_urls:
-            out.append(
-                "V-3: no cdn.abb-bank.az PDF links found in any fixture. Clean negative."
-            )
+            out.append("V-3: no cdn.abb-bank.az PDF links found in any fixture. Clean negative.")
         else:
             out.append(
                 f"V-3: {len(pdf_urls)} distinct PDF URL(s) found across fixtures: {pdf_urls}"
@@ -522,12 +513,10 @@ def main() -> int:
                 dim = len(eresp.data[0].embedding)
                 out.append(f"V-2: embedding model {embed_model} dimension={dim}")
             else:
-                out.append(
-                    f"V-2: default embedding model {embed_model} NOT in available list"
-                )
+                out.append(f"V-2: default embedding model {embed_model} NOT in available list")
 
-            schema_model = luna if luna_available else (
-                newest_mini or (gpt_ids[-1] if gpt_ids else None)
+            schema_model = (
+                luna if luna_available else (newest_mini or (gpt_ids[-1] if gpt_ids else None))
             )
             if schema_model:
                 try:
@@ -549,29 +538,28 @@ def main() -> int:
                         },
                     )
                     out.append(
-                        f"V-2: strict JSON schema on Responses API with "
-                        f"{schema_model}: SUPPORTED"
+                        f"V-2: strict JSON schema on Responses API with {schema_model}: SUPPORTED"
                     )
-                except Exception as e:  # noqa: BLE001 - deliberately broad, this is a probe
+                except Exception as e:  # deliberately broad, this is a probe
                     out.append(
                         f"V-2: strict JSON schema on Responses API with "
                         f"{schema_model}: UNSUPPORTED/FAILED — {e!r}"
                     )
             else:
                 out.append("V-2: no chat model available to test structured output against")
-        except Exception as e:  # noqa: BLE001 - deliberately broad, this is a probe
+        except Exception as e:  # deliberately broad, this is a probe
             out.append(f"V-2: PENDING — OPENAI_API_KEY present but call failed: {e!r}")
 
     # V-4: human browser step, per decision #3.
     out.append("\n--- V-4: localStorage quota (human step) ---")
     out.append("V-4: PENDING — human step. Paste into a browser console on any page:")
     out.append(
-        "const s = \"x\".repeat(975_000);\n"
-        "try { localStorage.setItem(\"probe\", s); "
-        "console.log(\"stored\", (JSON.stringify(localStorage).length * 2) / 1e6, "
-        "\"MB of quota\"); }\n"
-        "catch (e) { console.log(\"QUOTA EXCEEDED at\", s.length, \"chars\"); }\n"
-        "finally { localStorage.removeItem(\"probe\"); }"
+        'const s = "x".repeat(975_000);\n'
+        'try { localStorage.setItem("probe", s); '
+        'console.log("stored", (JSON.stringify(localStorage).length * 2) / 1e6, '
+        '"MB of quota"); }\n'
+        'catch (e) { console.log("QUOTA EXCEEDED at", s.length, "chars"); }\n'
+        'finally { localStorage.removeItem("probe"); }'
     )
 
     # Final safety net: never let the API key value reach the printed report,
