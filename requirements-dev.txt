@@ -16,3 +16,9 @@ pydantic==2.13.5
 # selectolax: fast (Lexbor-backed) HTML/XML parser used to parse sitemap.xml's <url>/
 # <loc>/<lastmod> nodes in fetch_sitemap. New dependency for this task.
 selectolax==0.4.11
+
+# Task 6: packages/scraper polite fetcher (SPEC §5.1).
+# protego: stdlib urllib.robotparser is first-match-wins (1994 draft), which on ABB's
+# actual robots.txt allows /cgi-bin/ despite its Disallow; protego implements RFC 9309
+# most-specific-match.
+protego==0.6.2
