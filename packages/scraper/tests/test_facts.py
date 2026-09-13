@@ -29,6 +29,7 @@ def test_value_then_label_order_is_parsed() -> None:
     facts = {f.attribute: f for f in extract_facts(STAT, "Nağd kredit", "https://abb-bank.az/x")}
     assert facts["max_amount"].value_num == 50000
     assert facts["max_amount"].unit == "AZN"
+    assert facts["max_amount"].currency == "AZN"
     assert facts["term_months"].value_num == 60
     assert facts["apr_min"].value_num == 10.9
     assert facts["collateral"].value_text == "Zaminsiz"
