@@ -42,6 +42,35 @@ def test_active_when_valid_to_is_exactly_today() -> None:
     assert c.status == "active" and c.valid_to == TODAY
 
 
+def test_unknown_when_start_date_is_in_the_future() -> None:
+    """Ruling P47 (fix round 2): a campaign that hasn't started yet is not
+    active -- telling a customer an offer is available when it isn't is a
+    factual error about a financial product -- and not expired either, so
+    it classifies unknown. Step 5 drops unknown and reports the count, so
+    an upcoming campaign is withheld rather than misrepresented, visibly
+    rather than silently."""
+    c = classify("01.10.2026 - 31.10.2026", TODAY)
+    assert c.status == "unknown"
+
+
+def test_active_when_start_date_is_exactly_today() -> None:
+    """Boundary for P47's new guard: `start > today`, not `start >= today` --
+    a campaign launching today is active on its own launch day, not
+    withheld as unknown. Pairs with test_active_when_valid_to_is_exactly_today
+    as the other end of the same window."""
+    c = classify("14.09.2026 - 31.10.2026", TODAY)
+    assert c.status == "active"
+
+
+def test_expiry_marker_on_a_future_dated_campaign_still_wins() -> None:
+    """P33's marker precedence survives P47's addition: the marker branch
+    runs before the future-start check, so an explicit expiry marker on a
+    page whose date range is entirely in the future still reports expired,
+    not unknown."""
+    c = classify("01.10.2026 - 31.10.2026 Aktiv deyil", TODAY)
+    assert c.status == "expired"
+
+
 def test_explicit_expiry_marker_confirms_but_does_not_replace_the_date_check() -> None:
     """Active pages carry no positive marker, so the date is the decision and the
     marker is corroboration only (SPEC §5.4)."""

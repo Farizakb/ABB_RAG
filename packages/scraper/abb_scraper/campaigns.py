@@ -51,10 +51,28 @@ def classify(text: str, today: date) -> CampaignStatus:
     kept regardless: an unattested guard is cheaper than the alternative if
     the site ever does render one of these markers into visible text --
     silently publishing an expired financial offer.
+
+    A campaign whose `valid_from` is still in the future (strictly after
+    `today`; a campaign that starts today is active, not unknown) also
+    classifies `unknown`, not `active` (controller ruling P47, fix round 2).
+    The status enum is deliberately fixed at active/expired/unknown -- a
+    fourth "upcoming" value would ripple into the DB enum and the contracts
+    package -- so `unknown` does double duty as "not yet decidable either
+    way": a not-yet-started campaign is plainly not `active` (telling a
+    customer an offer is available when it isn't is a factual error about a
+    financial product) and just as plainly not `expired`. Because the later
+    ingest step drops `unknown` and reports the count (brief Step 5), an
+    upcoming campaign is withheld rather than misrepresented, and its
+    exclusion is visible in the drop report rather than silent. This check
+    sits after the marker branch, not before it, so an explicit expiry
+    marker on a future-dated page still wins and reports `expired` -- P33's
+    marker precedence is unaffected by this addition.
     """
     start, end = parse_range(text)
     if any(mark in text for mark in EXPIRED_MARKERS):
         return CampaignStatus("expired", start, end)
     if end is None:
+        return CampaignStatus("unknown", start, end)
+    if start is not None and start > today:
         return CampaignStatus("unknown", start, end)
     return CampaignStatus("active" if end >= today else "expired", start, end)
