@@ -172,6 +172,7 @@ class PageText(NamedTuple):
     crumbs: list[str]
     dup_collapsed: int
     char_count: int
+    body: str
 
 
 def dedupe_blocks(blocks: list[Block]) -> tuple[list[Block], int]:
@@ -207,6 +208,43 @@ def page_meta(html: str) -> tuple[str, str]:
     return title, meta
 
 
+MIN_CHARS = 400  # measured: empty-shell baseline 190 (stub-empty), lowest genuine
+# page 439 (biznes-sub-korporativ) -- a 39-character margin.
+
+
+class DropRecord(NamedTuple):
+    url: str
+    reason: str
+    char_count: int
+
+
+def apply_gates(
+    pages: list[tuple[str, PageText]],
+) -> tuple[list[tuple[str, PageText]], list[DropRecord]]:
+    """SPEC §5.3 rules 4 and 5.
+
+    Rule 4 hashes the *body* only. Hashing title+description too would silently
+    delete every page sharing the generic site title.
+    """
+    kept: list[tuple[str, PageText]] = []
+    dropped: list[DropRecord] = []
+    seen_bodies: set[str] = set()
+
+    for url, page in pages:
+        body = page.body
+        key = hashlib.sha256(re.sub(r"\s+", " ", body.lower()).encode()).hexdigest()
+        if body and key in seen_bodies:
+            dropped.append(DropRecord(url, "cross-document-duplicate", page.char_count))
+            continue
+        if page.char_count < MIN_CHARS:
+            dropped.append(DropRecord(url, "under-400-chars", page.char_count))
+            continue
+        seen_bodies.add(key)
+        kept.append((url, page))
+
+    return kept, dropped
+
+
 def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageText:
     """Rules 1-3 composed. Rule 3 recovers the root stubs, whose whole content
     is a question in the title and a one-sentence answer in the description.
@@ -223,4 +261,6 @@ def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageTe
         title, meta = title or fallback_title, meta or fallback_meta
     body = "\n".join(b.text for b in kept)
     text = "\n".join(p for p in (title, meta, body) if p)
-    return PageText(text=text, crumbs=crumbs, dup_collapsed=collapsed, char_count=len(text))
+    return PageText(
+        text=text, crumbs=crumbs, dup_collapsed=collapsed, char_count=len(text), body=body
+    )
