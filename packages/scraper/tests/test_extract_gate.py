@@ -28,7 +28,15 @@ def test_gate_is_400_not_150() -> None:
     below it passes every empty page — which is why v1.0's 150 was inoperative."""
     assert MIN_CHARS == 400
     assert MIN_CHARS > 190  # must exceed the empty-shell baseline (stub-empty) to drop it
-    assert MIN_CHARS <= 439  # must not exceed the lowest genuine page (biznes-sub-korporativ)
+    # Must not exceed the lowest genuine kept document, measured corpus-wide (243
+    # kept documents, full 551-page crawl 2026-09-13) -- not just the 11 committed
+    # fixtures' 439 (biznes-sub-korporativ), which is a strictly smaller sample and
+    # would let MIN_CHARS silently rise past a real page (Ruling P57). The lowest
+    # genuine kept document is https://abb-bank.az/haqqimizda/rekvizitler at 410
+    # chars. /ferdi/valyuta-mezenneleri (202 chars) is NOT a counterexample: it is
+    # the single `volatile` page in SPEC §5.4 pointer mode, whose body is
+    # deliberately discarded by corpus.py after char_count was computed.
+    assert MIN_CHARS <= 410
 
 
 def test_empty_shell_at_the_measured_baseline_is_dropped() -> None:

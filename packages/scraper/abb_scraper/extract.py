@@ -208,8 +208,9 @@ def page_meta(html: str) -> tuple[str, str]:
     return title, meta
 
 
-MIN_CHARS = 400  # measured: empty-shell baseline 190 (stub-empty), lowest genuine
-# page 439 (biznes-sub-korporativ) -- a 39-character margin.
+MIN_CHARS = 400  # measured corpus-wide (243 kept documents, full crawl 2026-09-13):
+# empty-shell baseline 190 (stub-empty), lowest genuine kept document 410
+# (haqqimizda/rekvizitler) -- a 10-character margin.
 
 
 class DropRecord(NamedTuple):
