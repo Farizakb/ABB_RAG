@@ -86,13 +86,18 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
 
     The fix: `PageText.body` is now set explicitly by extract_page from the
     same joined body string, before `if p` filtering can drop it. This is a
-    standing check across all 11 fixtures in fixtures/raw/ (stub-empty.html
+    standing check across all fixtures in fixtures/raw/ (stub-empty.html
     included) that `page.body` always equals the real joined block text --
     independently re-derived here straight from content_blocks +
     dedupe_blocks (the same path extract_page itself takes to build `body`),
-    rather than trusting extract_page's own value against itself."""
+    rather than trusting extract_page's own value against itself.
+
+    Count raised 11 -> 13 by Task 12: `listing-kampaniyalar.html` (0 bytes --
+    the real page 404'd, RECON.md's dated day-two heading) and
+    `listing-ferdi-kreditler.html` were added to the fixture set, and both
+    still need to clear this same positional-recovery check."""
     fixtures = sorted(RAW.glob("*.html"))
-    assert len(fixtures) == 11, f"expected 11 fixtures, found {len(fixtures)}"
+    assert len(fixtures) == 13, f"expected 13 fixtures, found {len(fixtures)}"
 
     for path in fixtures:
         html = path.read_text("utf-8")
