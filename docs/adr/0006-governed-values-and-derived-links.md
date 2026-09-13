@@ -82,6 +82,36 @@ measured count exactly), and `/ferdi/kampaniyalar` present once per locale
 refuting it. Exact grep commands and counts are in `RECON.md`'s "Task 12 fix
 round 1" heading. This discrepancy is recorded, not adjudicated, here.
 
+**Fix round 2 (controller ruling P51) — resolved.** The coordinator re-ran
+their sitemap check with an exact-match query and confirmed fix round 1's
+re-grep was correct: over all 7,042 `<loc>` entries, `/kampaniyalar` (bare)
+appears 0 times, `/ferdi/kampaniyalar` appears 1 time, and 247 entries start
+with `/kampaniyalar/` (children only — the hub itself is absent). Their
+fix-round-1 "13 occurrences" figure was a regex artifact: a character class
+that stopped at digits/uppercase truncated slug children like
+`/kampaniyalar/abb-play-2026` down to `/kampaniyalar/` and miscounted them
+as hub hits. This 247-children/0-hub asymmetry is exactly why the wrong URL
+looked plausible, and is a useful general lesson (a section can be heavily
+populated in a sitemap with no index page of its own).
+
+Authorized fetch of `https://abb-bank.az/ferdi/kampaniyalar`: **HTTP 200**,
+593,870 bytes, saved as `fixtures/raw/listing-ferdi-kampaniyalar.html` and
+committed. `fixtures/raw/listing-kampaniyalar.html` (the two prior 404
+bodies) deleted — a committed 404 is a trap for the next reader once
+superseded. Re-measured through `extract_page`/`content_blocks`: the page is
+real but a **client-rendered shell** — 5 content blocks total (`h1
+"Kampaniyalar"`, `p "Ən son kampaniyalar"`, three generic ABB-mobile-app
+promo blocks), **320 extracted chars, under the §5.3 400-char gate**, and
+zero `/kampaniyalar/<slug>` child links anywhere in its raw HTML. So
+`listing_enumerates == 0.00 < 0.60` — the campaign index is kept, and this
+time on two independent grounds (no enumeration, and the page would be
+gate-dropped regardless).
+
+The campaign index's anchor is now `https://abb-bank.az/ferdi/kampaniyalar`
+— a real, HTTP-200 URL. The citation-resolution risk carried since fix round
+0 is resolved: the previous two rounds' rejection of the bare and
+trailing-slash spellings (both confirmed 404) was correct, not overcautious.
+
 ## Decision
 
 Per §5.5's table (one class at/above the 0.60 threshold, one class below —
@@ -103,25 +133,19 @@ with the product branch it would have exercised).
 
 ## Consequences
 
-- The campaign index's citation is anchored to `https://abb-bank.az/kampaniyalar`
-  (SPEC §5.5's named anchor, pinned verbatim by
-  `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`).
-  **This URL is confirmed, twice, not to resolve** (fix rounds 0 and 1, two
-  different exact URL strings, both HTTP 404). This is exactly the citation-
-  resolution failure Invariant 1 and §5.5 exist to prevent, and it is not
-  silently patched around here: fix round 1's proposed fix (switch the anchor
-  to the trailing-slash spelling) was tried and rejected, because that URL is
-  *also* confirmed 404 — adopting it would satisfy the letter of "add a
-  trailing slash" while shipping the identical defect under a different
-  spelling. The anchor stays at the brief's original frozen value rather than
-  churning to an equally-broken alternative. **This is a real, open, blocking
-  risk for whoever next touches `§11.2`'s footer link or the campaign ingest
-  path**, not a cosmetic one: the strongest evidence in hand (`/ferdi/kampaniyalar`,
-  sitemap-declared for all three locales, and the only listing-shaped URL any
-  committed fixture links to) has not itself been fetched, so it is not
-  adopted without explicit authorization for one more URL. Do not ship the
-  campaign index's citation as-is without either verifying a working anchor
-  or accepting this risk consciously.
+- The campaign index's citation is anchored to `https://abb-bank.az/ferdi/kampaniyalar`
+  (fix round 2; SPEC §5.5's originally-named `/kampaniyalar` was confirmed
+  absent from the site — two direct 404s, and 0 of 7,042 sitemap `<loc>`
+  entries, even though 247 of its own children are present there), pinned
+  verbatim by `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`.
+  **This URL is confirmed HTTP 200 by direct fetch** — the citation-
+  resolution risk carried since fix round 0 is resolved. The page itself is
+  a client-rendered shell content-wise (320 extracted chars, under the §5.3
+  400-char gate) — a separate, already-handled concern (the gate exists
+  precisely for pages like this), not a citation-resolution defect: a real
+  visitor following the footer link lands on a real page, even though our
+  scraper (no JS execution) cannot recover its campaign list from that same
+  fetch.
 - No product index exists. A product enumeration question ("hansı
   kreditləriniz var") is answered by retrieval finding `/ferdi/kreditler`
   itself as an ordinary chunk — which is the intended outcome, not a gap:
@@ -129,5 +153,6 @@ with the product branch it would have exercised).
   maintenance than a synthetic copy could offer.
 - `_abb_already_enumerates` is a runtime guard, not a one-time flag: if a
   future scrape (Task 13 onward) finds `/ferdi/kreditler` no longer names its
-  products, or finds `/kampaniyalar` alive and enumerating, `index_documents`
-  changes its output automatically on the next ingest, without a code change.
+  products, or finds `/ferdi/kampaniyalar` server-rendering its campaign list
+  (it is currently a client-rendered shell), `index_documents` changes its
+  output automatically on the next ingest, without a code change.

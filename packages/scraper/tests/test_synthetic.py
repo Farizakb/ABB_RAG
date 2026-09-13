@@ -105,9 +105,16 @@ def test_no_index_document_claims_recency() -> None:
 
 
 def test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves() -> None:
+    """Fix round 2 (controller ruling P51): the bare `/kampaniyalar` is
+    confirmed absent from the site (two direct 404s, and absent from the
+    sitemap's 7,042 entries even though 247 of its own children are
+    present). The real, HTTP-200 campaigns hub is `/ferdi/kampaniyalar`
+    (`fixtures/raw/listing-ferdi-kampaniyalar.html`) -- a client-rendered
+    shell content-wise, but a page that actually resolves, which is what
+    this test pins."""
     docs = [doc("https://abb-bank.az/kampaniyalar/a", "A", "campaign", vt=date(2026, 10, 31))]
     idx = next(d for d in index_documents(docs) if d.source_class == "index")
-    assert idx.url == "https://abb-bank.az/kampaniyalar"
+    assert idx.url == "https://abb-bank.az/ferdi/kampaniyalar"
 
 
 def test_index_documents_are_never_built_from_other_index_documents() -> None:
@@ -125,7 +132,7 @@ def test_no_synthetic_index_when_abbs_own_listing_page_already_enumerates() -> N
         doc("https://abb-bank.az/kampaniyalar/b", "Kampaniya B", "campaign", vt=date(2026, 12, 1)),
     ]
     listing = Document(
-        url="https://abb-bank.az/kampaniyalar",
+        url="https://abb-bank.az/ferdi/kampaniyalar",
         title="Kampaniyalar",
         section_path=[],
         source_class="stub",
@@ -140,7 +147,7 @@ def test_synthetic_index_is_still_built_when_the_listing_page_is_a_client_render
         doc("https://abb-bank.az/kampaniyalar/a", "Kampaniya A", "campaign", vt=date(2026, 10, 31))
     ]
     shell = Document(
-        url="https://abb-bank.az/kampaniyalar",
+        url="https://abb-bank.az/ferdi/kampaniyalar",
         title="Kampaniyalar",
         section_path=[],
         source_class="stub",

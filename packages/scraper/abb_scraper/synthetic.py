@@ -145,14 +145,23 @@ def index_documents(docs: list[Document]) -> list[Document]:
       enumerates its own credit products and no product index is built.
       The losing branch is deleted per SPEC §8.3's rule, not kept behind a
       condition.
-    - `/kampaniyalar` returned **HTTP 404** on direct fetch -- it does not
-      exist on the live site right now, so it cannot enumerate anything and
-      cannot clear the §5.3 gate either. The campaign index is therefore
-      built. `_abb_already_enumerates` is still called on every ingest
-      (not skipped just because Step 1's one-off probe 404'd): if ABB ships
-      a working `/kampaniyalar` listing later, a corpus scraped after that
-      redesign stops growing this index automatically, without a code
-      change here.
+    - `/kampaniyalar` (bare) does not exist at all -- confirmed twice, two
+      different exact URL strings, both HTTP 404 (fix rounds 0 and 1) -- and
+      is absent from the sitemap entirely (0 of 7,042 `<loc>` entries),
+      even though 247 of its own children (`/kampaniyalar/<slug>`) are
+      present there. The real campaigns hub is `/ferdi/kampaniyalar`
+      (fix round 2, controller ruling P51): HTTP 200, but a client-rendered
+      shell -- `extract_page` recovers only 320 chars ("Kampaniyalar", "Ən
+      son kampaniyalar", plus generic ABB-mobile-app boilerplate), under the
+      §5.3 400-char gate, and zero same-prefix child links exist anywhere in
+      its raw HTML. So the campaign index is built both because ABB's real
+      hub doesn't enumerate its children (0.00 < 0.60) and because the page
+      itself would be dropped by the §5.3 gate regardless.
+      `_abb_already_enumerates` is still called on every ingest (not skipped
+      just because this one-off probe found a shell): if ABB ever ships a
+      working `/ferdi/kampaniyalar` that server-renders its campaign list, a
+      corpus scraped after that redesign stops growing this index
+      automatically, without a code change here.
 
     Top-k similarity returns k things; an enumeration question asks for all
     of them.
@@ -166,7 +175,7 @@ def index_documents(docs: list[Document]) -> list[Document]:
         (d for d in source if d.source_class == "campaign"),
         key=lambda d: (d.valid_to or FAR_FUTURE, d.title),
     )
-    if campaigns and _abb_already_enumerates(f"{HOST}/kampaniyalar", campaigns, source):
+    if campaigns and _abb_already_enumerates(f"{HOST}/ferdi/kampaniyalar", campaigns, source):
         campaigns = []
     if not campaigns:
         return []
@@ -176,5 +185,7 @@ def index_documents(docs: list[Document]) -> list[Document]:
         for d in campaigns
     ]
     return [
-        _index_doc("ABB-nin aktiv kampaniyaları", f"{HOST}/kampaniyalar", rows, ["Kampaniyalar"])
+        _index_doc(
+            "ABB-nin aktiv kampaniyaları", f"{HOST}/ferdi/kampaniyalar", rows, ["Kampaniyalar"]
+        )
     ]
