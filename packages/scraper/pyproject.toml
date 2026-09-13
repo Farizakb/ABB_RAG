@@ -6,7 +6,19 @@ build-backend = "hatchling.build"
 name = "abb-scraper"
 version = "0.1.0"
 requires-python = ">=3.12"
-dependencies = ["httpx==0.28.1", "selectolax==0.4.11", "protego==0.6.2"]
+dependencies = [
+  "httpx==0.28.1",
+  "selectolax==0.4.11",
+  "protego==0.6.2",
+  "typer==0.15.1",
+  # click>=8.2 changed Parameter.make_metavar()'s signature; typer==0.15.1's
+  # rich help formatter calls the old one and crashes on `--help` under an
+  # unpinned click. Pinned explicitly rather than left to resolve floating.
+  "click==8.1.8",
+]
+
+[project.scripts]
+abb-scrape = "abb_scraper.cli:app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["abb_scraper"]
