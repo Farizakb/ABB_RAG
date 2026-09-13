@@ -1,0 +1,10 @@
+# services/rag runtime dependencies. Every version pinned exactly (Invariant:
+# reproducible builds). Where a package is also pinned in requirements-dev.txt
+# (pydantic, openai), the pin here matches it -- one version per package.
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+psycopg[binary]==3.3.5
+psycopg-pool==3.3.1
+openai==3.13.0

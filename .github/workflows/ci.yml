@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -e packages/contracts -e packages/scraper -r requirements-dev.txt
+      - run: pip install -e packages/contracts -e packages/scraper -r requirements-dev.txt -r services/rag/requirements.txt
       - run: ruff format --check . && ruff check . && mypy
       - run: psql "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f db/migrations/001_schema.sql
       # services/rag/app and services/chat/app are both top-level package `app`,
