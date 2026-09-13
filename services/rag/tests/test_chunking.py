@@ -88,6 +88,28 @@ def test_a_single_oversized_section_becomes_one_chunk_over_the_bound() -> None:
     assert chunks[0].token_count > CHUNK_TOKENS
 
 
+def test_overlap_cap_bounds_the_carried_tail() -> None:
+    """Proves the CHUNK_OVERLAP cap (ruling 2) is load-bearing. Every line in
+    every other test in this file is well under CHUNK_OVERLAP (80) tokens --
+    matching the real corpus, whose max line is 63 tokens -- so the capped and
+    uncapped carry paths are behaviourally identical everywhere else in this
+    suite; removing the cap leaves all other tests green.
+
+    Section A is sized just above CHUNK_OVERLAP (~101 tokens, "söz " * 50).
+    Section B is sized so A + B comfortably exceeds CHUNK_TOKENS + CHUNK_OVERLAP
+    (~702 tokens, "söz " * 300), while B alone does not. Capped: A's tail (101
+    > CHUNK_OVERLAP) is dropped, so the second chunk is B alone (~602 tokens,
+    within bound). Uncapped (the brief's original `current[-1:]`, which carries
+    the whole previous section regardless of size): A's full tail carries
+    forward and the second chunk becomes A + B (~702 tokens), breaking the
+    bound this test asserts.
+    """
+    a = "söz " * 50
+    b = "söz " * 300
+    chunks = chunk_document(doc(f"{a}\n{b}"))
+    assert all(c.token_count <= CHUNK_TOKENS + CHUNK_OVERLAP for c in chunks)
+
+
 def test_azerbaijani_fragments_more_than_english() -> None:
     """The measurement §7.1 defers to day two. Azerbaijani is agglutinative and
     English-centric BPE fragments it, which moves chunk count and cost together."""
