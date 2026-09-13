@@ -3,7 +3,12 @@
 from datetime import date
 from pathlib import Path
 
-from abb_scraper.synthetic import bank_facts_document, index_documents, listing_enumerates
+from abb_scraper.synthetic import (
+    _abb_already_enumerates,
+    bank_facts_document,
+    index_documents,
+    listing_enumerates,
+)
 from contracts.models import Document, SourceClass
 
 
@@ -155,3 +160,35 @@ def test_synthetic_index_is_still_built_when_the_listing_page_is_a_client_render
         content_hash="sha256:shell",
     )
     assert len(index_documents([*members, shell])) == 1
+
+
+def test_exactly_at_the_060_threshold_counts_as_already_enumerates() -> None:
+    """Fix round 3. `ENUMERATES_THRESHOLD` (0.60) is SPEC §5.5's pre-committed
+    rule deciding whether a synthetic index exists at all, not a readability
+    heuristic (contrast `facts.MAX_FRAGMENT_CHARS`, left unpinned under P48) --
+    so its boundary is pinned here. A mutation of `_abb_already_enumerates`'s
+    `>=` to `>` left the whole suite green before this test existed.
+
+    5 members, 3 named in the listing text: a genuine 3/5 = 0.60, asserted via
+    `listing_enumerates` itself (not hand-verified against the fixture) before
+    being routed through `_abb_already_enumerates`, the function that actually
+    owns this comparison."""
+    members = [
+        doc(f"https://abb-bank.az/kampaniyalar/{c}", f"Kampaniya {c}", "campaign") for c in "ABCDE"
+    ]
+    listing = Document(
+        url="https://abb-bank.az/ferdi/kampaniyalar",
+        title="Kampaniyalar",
+        section_path=[],
+        source_class="stub",
+        text="Kampaniyalar\nKampaniya A\nKampaniya B\nKampaniya C\n" + "x" * 500,
+        content_hash="sha256:boundary",
+    )
+    fraction = listing_enumerates(listing.text, [m.title for m in members])
+    assert fraction == 0.6  # proof the fixture genuinely sits at the boundary
+    assert (
+        _abb_already_enumerates(
+            "https://abb-bank.az/ferdi/kampaniyalar", members, [*members, listing]
+        )
+        is True
+    )
