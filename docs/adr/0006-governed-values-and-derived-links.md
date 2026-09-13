@@ -64,6 +64,24 @@ ABB's real campaigns hub, if one exists, lives at a different path. Per the
 controller ruling's two-URL budget, that alternate path was not fetched to
 confirm it; this is an open question, not a resolved one (see Consequences).
 
+**Fix round 1 (controller ruling P50).** The coordinator hypothesized the 404
+was a missing-trailing-slash artifact and authorized one more fetch,
+`https://abb-bank.az/kampaniyalar/`. Result: still HTTP 404 — the server
+redirects the trailing-slash form onto the bare one, which is the same 404 as
+before (`fixtures/raw/listing-kampaniyalar.html`, byte-identical, re-saved
+under the same name per the ruling). Re-measured through
+`extract_page`/`listing_enumerates` rather than a raw-HTML grep: still
+**0.00 < 0.60**. The coordinator's supporting evidence (a claimed grep of
+`data/sitemap.xml` finding the trailing-slash form 13 times and no
+`/ferdi/kampaniyalar` at all) does not reproduce against the same cached
+file: re-grepped locally (no network) and found **zero** `<loc>` entries for
+any bare `/kampaniyalar` or `/kampaniyalar/` parent under any locale, 247
+`kampaniyalar/<slug>` children (matching `RECON.md` §3's independently
+measured count exactly), and `/ferdi/kampaniyalar` present once per locale
+(3 matches) — corroborating fix round 0's breadcrumb-based finding, not
+refuting it. Exact grep commands and counts are in `RECON.md`'s "Task 12 fix
+round 1" heading. This discrepancy is recorded, not adjudicated, here.
+
 ## Decision
 
 Per §5.5's table (one class at/above the 0.60 threshold, one class below —
@@ -88,14 +106,22 @@ with the product branch it would have exercised).
 - The campaign index's citation is anchored to `https://abb-bank.az/kampaniyalar`
   (SPEC §5.5's named anchor, pinned verbatim by
   `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`).
-  As of this measurement, that URL 404s live. This is a real citation-
-  resolution risk of the exact kind §5.5 exists to avoid, and it is not
-  silently patched around here: the anchor URL is a frozen interface value
-  from the task-12 brief, and changing it without re-verifying which URL (if
-  any) is ABB's real campaigns hub would trade one unverified assumption for
-  another. Flagged for whoever next touches `§11.2`'s footer link or the
-  campaign ingest path: confirm whether `/ferdi/kampaniyalar` is the correct
-  anchor before this ships.
+  **This URL is confirmed, twice, not to resolve** (fix rounds 0 and 1, two
+  different exact URL strings, both HTTP 404). This is exactly the citation-
+  resolution failure Invariant 1 and §5.5 exist to prevent, and it is not
+  silently patched around here: fix round 1's proposed fix (switch the anchor
+  to the trailing-slash spelling) was tried and rejected, because that URL is
+  *also* confirmed 404 — adopting it would satisfy the letter of "add a
+  trailing slash" while shipping the identical defect under a different
+  spelling. The anchor stays at the brief's original frozen value rather than
+  churning to an equally-broken alternative. **This is a real, open, blocking
+  risk for whoever next touches `§11.2`'s footer link or the campaign ingest
+  path**, not a cosmetic one: the strongest evidence in hand (`/ferdi/kampaniyalar`,
+  sitemap-declared for all three locales, and the only listing-shaped URL any
+  committed fixture links to) has not itself been fetched, so it is not
+  adopted without explicit authorization for one more URL. Do not ship the
+  campaign index's citation as-is without either verifying a working anchor
+  or accepting this risk consciously.
 - No product index exists. A product enumeration question ("hansı
   kreditləriniz var") is answered by retrieval finding `/ferdi/kreditler`
   itself as an ordinary chunk — which is the intended outcome, not a gap:
