@@ -27,8 +27,8 @@ def test_gate_is_400_not_150() -> None:
     """SPEC §5.3 rule 5. The measured empty shell is 190 chars, so any gate at or
     below it passes every empty page — which is why v1.0's 150 was inoperative."""
     assert MIN_CHARS == 400
-    assert MIN_CHARS > 273
-    assert MIN_CHARS < 1349
+    assert MIN_CHARS > 190  # must exceed the empty-shell baseline (stub-empty) to drop it
+    assert MIN_CHARS <= 439  # must not exceed the lowest genuine page (biznes-sub-korporativ)
 
 
 def test_empty_shell_at_the_measured_baseline_is_dropped() -> None:
