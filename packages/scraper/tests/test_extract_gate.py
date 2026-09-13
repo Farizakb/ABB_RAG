@@ -13,12 +13,18 @@ from abb_scraper.extract import (
 RAW = Path("fixtures/raw")
 
 
-def page(text: str) -> PageText:
-    return PageText(text=text, crumbs=[], dup_collapsed=0, char_count=len(text), body=text)
+def page(text: str, body: str | None = None) -> PageText:
+    return PageText(
+        text=text,
+        crumbs=[],
+        dup_collapsed=0,
+        char_count=len(text),
+        body=text if body is None else body,
+    )
 
 
 def test_gate_is_400_not_150() -> None:
-    """SPEC §5.3 rule 5. The measured empty shell is 273 chars, so any gate at or
+    """SPEC §5.3 rule 5. The measured empty shell is 190 chars, so any gate at or
     below it passes every empty page — which is why v1.0's 150 was inoperative."""
     assert MIN_CHARS == 400
     assert MIN_CHARS > 273
@@ -43,6 +49,22 @@ def test_cross_document_duplicate_bodies_collapse_to_the_first() -> None:
     )
     assert [u for u, _ in kept] == ["https://abb-bank.az/a"]
     assert dropped[0].reason == "cross-document-duplicate"
+
+
+def test_two_bodyless_pages_are_not_deduped_against_each_other() -> None:
+    """Ruling P41's crux: `apply_gates`'s `if body and key in seen_bodies:`
+    guard exists precisely so an empty body never collides via hash("").
+    Two unrelated bodyless root stubs (SPEC §5.3 rule 3) -- title+meta alone
+    clearing the 400-char gate, zero content blocks -- must both survive;
+    neither may be dropped as a cross-document-duplicate of the other."""
+    kept, dropped = apply_gates(
+        [
+            ("https://abb-bank.az/stub-a", page("a" * 450, body="")),
+            ("https://abb-bank.az/stub-b", page("b" * 450, body="")),
+        ]
+    )
+    assert [u for u, _ in kept] == ["https://abb-bank.az/stub-a", "https://abb-bank.az/stub-b"]
+    assert dropped == []
 
 
 def test_every_drop_is_reported_with_its_char_count() -> None:
