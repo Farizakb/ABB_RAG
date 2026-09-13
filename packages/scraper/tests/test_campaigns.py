@@ -31,6 +31,17 @@ def test_active_when_end_date_is_in_the_future() -> None:
     assert c.status == "active" and c.valid_to == date(2026, 10, 31)
 
 
+def test_active_when_valid_to_is_exactly_today() -> None:
+    """Fix round 1 finding: `end >= today` had no test pinning its boundary --
+    mutating it to `end > today` left the full suite green. An offer whose
+    last valid day is today (2026-09-14, the same injected TODAY used
+    throughout this file, not `date.today()`) must still read as active: it
+    is still valid on its last day, and flipping it to expired a day early
+    is exactly the silent-drop risk invariant 9 exists to prevent."""
+    c = classify("01.09.2026 - 14.09.2026", TODAY)
+    assert c.status == "active" and c.valid_to == TODAY
+
+
 def test_explicit_expiry_marker_confirms_but_does_not_replace_the_date_check() -> None:
     """Active pages carry no positive marker, so the date is the decision and the
     marker is corroboration only (SPEC §5.4)."""
