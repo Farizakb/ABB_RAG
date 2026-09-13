@@ -1,8 +1,10 @@
 # packages/scraper/abb_scraper/extract.py
 from __future__ import annotations
 
+import hashlib
 import re
 from typing import NamedTuple
+from urllib.parse import urlparse
 
 from selectolax.parser import HTMLParser, Node
 
@@ -163,3 +165,62 @@ def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
     blocks = [b for node, b in pairs if not _is_chrome(node)]
 
     return blocks, crumbs
+
+
+class PageText(NamedTuple):
+    text: str
+    crumbs: list[str]
+    dup_collapsed: int
+    char_count: int
+
+
+def dedupe_blocks(blocks: list[Block]) -> tuple[list[Block], int]:
+    """SPEC §5.3 rule 2. Hash each block, keep the first, count the rest.
+
+    The key folds both case AND whitespace (`re.sub(r"\\s+", " ", ...)`), not
+    case alone: real pages repeat the same block with differing inline
+    whitespace after a template re-render (e.g. "Nağd  Kredit" vs "nağd
+    kredit"), and under-collapsing here costs more than over-collapsing --
+    rule 2 is the single largest ingestion win (SPEC §5.3, RECON §5).
+    """
+    seen: set[str] = set()
+    kept: list[Block] = []
+    collapsed = 0
+    for b in blocks:
+        norm = re.sub(r"\s+", " ", b.text.lower()).strip()
+        key = hashlib.sha256(norm.encode()).hexdigest()
+        if key in seen:
+            collapsed += 1
+            continue
+        seen.add(key)
+        kept.append(b)
+    return kept, collapsed
+
+
+def page_meta(html: str) -> tuple[str, str]:
+    """The `<title>` and `<meta name="description">` content, cleaned."""
+    tree = HTMLParser(html)
+    t = tree.css_first("title")
+    m = tree.css_first('meta[name="description"]')
+    title = _clean(t.text()) if t else ""
+    meta = _clean(m.attributes.get("content") or "") if m else ""
+    return title, meta
+
+
+def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageText:
+    """Rules 1-3 composed. Rule 3 recovers the root stubs, whose whole content
+    is a question in the title and a one-sentence answer in the description.
+
+    `title`/`meta` are accepted as parameters (rather than always parsed from
+    `html`) so a caller that already has them from a sitemap/index page need
+    not re-parse; when either is omitted, it falls back to `page_meta(html)`.
+    """
+    path = urlparse(url).path or "/"
+    blocks, crumbs = content_blocks(html, path)
+    kept, collapsed = dedupe_blocks(blocks)
+    if not title or not meta:
+        fallback_title, fallback_meta = page_meta(html)
+        title, meta = title or fallback_title, meta or fallback_meta
+    body = "\n".join(b.text for b in kept)
+    text = "\n".join(p for p in (title, meta, body) if p)
+    return PageText(text=text, crumbs=crumbs, dup_collapsed=collapsed, char_count=len(text))
