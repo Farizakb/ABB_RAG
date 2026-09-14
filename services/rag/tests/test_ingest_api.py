@@ -138,3 +138,38 @@ def test_ingest_failure_is_recorded_only_on_the_matching_model_row(
         ).fetchall()
     )
     assert rows == {"other-model": "ready", "broken-model": "failed"}
+
+
+def test_get_status_reads_only_the_matching_model_row(db: Any) -> None:
+    """P76: the GET SELECT must filter on embedding_model as well as
+    content_hash -- otherwise, given two rows for the same corpus under
+    different models (Invariant 8), it could return the wrong one. Plant two
+    rows with the SAME content_hash and DIFFERENT embedding_model, in
+    distinguishable states, and assert the response matches the row for the
+    model app.routes.get_embedder() returns (FakeEmbedder(dim=8), model
+    'fake-embedder' per the autouse fixture above)."""
+    matching_model = "fake-embedder"
+    other_model = "other-model"
+    c = _corpus("sha256:two-models-get")
+
+    # Plant the NON-matching row first, on purpose: with no ORDER BY, a plain
+    # sequential scan over a freshly truncated table returns rows in
+    # insertion order, so a SELECT missing the `embedding_model` filter would
+    # return THIS row -- making the assertions below fail loudly rather than
+    # passing by insertion-order coincidence.
+    db.execute(
+        "INSERT INTO rag.corpora (id, content_hash, manifest, doc_count, chunk_count, "
+        "status, stage, embedding_model, embedding_version) "
+        "VALUES (gen_random_uuid(), %s, '{}', 99, 99, 'ready', 'ready', %s, 1)",
+        (c.corpus_id, other_model),
+    )
+    db.execute(
+        "INSERT INTO rag.corpora (id, content_hash, manifest, doc_count, chunk_count, "
+        "status, stage, embedding_model, embedding_version) "
+        "VALUES (gen_random_uuid(), %s, '{}', 1, 1, 'ready', 'ready', %s, 1)",
+        (c.corpus_id, matching_model),
+    )
+
+    body = client.get(f"/api/v1/corpora/{c.corpus_id}").json()
+    assert body["embedding_model"] == matching_model
+    assert body["doc_count"] == 1 and body["chunk_count"] == 1
