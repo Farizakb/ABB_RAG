@@ -137,8 +137,13 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
     timings = {"retrieval_ms": r.took_ms}
 
     if not r.sources:
-        # Floor caught it before an API call was made (SPEC §7.5)
-        return _refuse([], "out_of_scope", r.candidates, {**timings, "generation_ms": 0}, {})
+        # Floor caught it before an API call was made (SPEC §7.5). P94: which
+        # refusal copy the customer sees -- and whether they are routed to 937 --
+        # must not depend on whether retrieval happened to clear the floor, so
+        # this path picks the refusal class the same way the grounded path
+        # below does (SPEC §7.6), instead of always claiming out_of_scope.
+        early_klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
+        return _refuse([], early_klass, r.candidates, {**timings, "generation_ms": 0}, {})
 
     prompt = build_prompt(question, r.sources, source_texts(corpus_id, r.sources, embedder))
 
@@ -188,7 +193,7 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
 ADVISORY_HINTS = (
     "uyğun",
     "təsdiq",
-    "nə qədər götürə",
+    "nə qədər kredit götürə",
     "mənə hansı",
     "will i",
     "am i eligible",
