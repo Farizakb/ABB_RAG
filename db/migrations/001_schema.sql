@@ -4,11 +4,20 @@ CREATE SCHEMA IF NOT EXISTS rag;
 CREATE SCHEMA IF NOT EXISTS app;
 
 CREATE TABLE rag.corpora (
-  id uuid PRIMARY KEY, content_hash text UNIQUE NOT NULL, manifest jsonb NOT NULL,
+  id uuid PRIMARY KEY, content_hash text NOT NULL, manifest jsonb NOT NULL,
   doc_count int, chunk_count int, dropped_count int,
-  embedding_model text, embedding_version int,
+  embedding_model text NOT NULL, embedding_version int,
   status text NOT NULL, stage text, error text,
-  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now()
+  created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
+  -- SPEC §7.2's idempotency key is (content_hash, embedding_model), not
+  -- content_hash alone (P65): re-ingesting the same corpus under a second
+  -- embedding model is a legitimate, required state (Invariant 8 -- never
+  -- silently mix vector spaces from two models in one index), so the same
+  -- content_hash must be allowed to appear once per model. A column-level
+  -- UNIQUE on content_hash cannot express that; embedding_model must also be
+  -- NOT NULL so it can sit in a composite key (a NULL never equals another
+  -- NULL, so a nullable column can't carry a uniqueness guarantee).
+  UNIQUE (content_hash, embedding_model)
 );
 
 CREATE TABLE rag.documents (

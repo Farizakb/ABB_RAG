@@ -11,6 +11,13 @@ pre-commit==4.6.2
 # Task 4: packages/contracts models (rag/chat shared schema).
 pydantic==2.13.5
 
+# Task 16: services/rag/conftest.py builds and migrates a `*_test` database
+# directly from the host to run ingest tests (P68) -- needs psycopg on the
+# host even though it's already pinned in services/rag/requirements.txt for
+# the container. Pins match that file exactly.
+psycopg[binary]==3.3.5
+psycopg-pool==3.3.1
+
 # Task 5: packages/scraper sitemap filter (SPEC §5.2).
 # httpx is already pinned above (Task 1); reused here for fetch_sitemap's client param.
 # selectolax: fast (Lexbor-backed) HTML/XML parser used to parse sitemap.xml's <url>/

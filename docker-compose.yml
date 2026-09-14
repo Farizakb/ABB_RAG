@@ -4,6 +4,10 @@ services:
     environment: { POSTGRES_USER: abb, POSTGRES_PASSWORD: abb, POSTGRES_DB: abb, EMBEDDING_DIM: "${EMBEDDING_DIM}" }
     volumes: ["pgdata:/var/lib/postgresql/data", "./db/migrations:/migrations:ro", "./db/init:/docker-entrypoint-initdb.d:ro"]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U abb"], interval: 5s, retries: 10 }
+    # Loopback-only, deliberately (P70): lets host-side `pytest services/rag`
+    # reach Postgres to build its own `_test` database. `rag` (which holds the
+    # OpenAI key) gets no such port -- that absence is a standing ruling.
+    ports: ["127.0.0.1:5432:5432"]
   rag:
     build: { context: ., dockerfile: services/rag/Dockerfile }
     env_file: [.env]
