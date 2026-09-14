@@ -4,7 +4,7 @@
 import json
 from pathlib import Path
 
-from abb_scraper.extract import Block, content_blocks, extract_page, faq_blocks
+from abb_scraper.extract import FAQ_TAG, Block, content_blocks, extract_page, faq_blocks
 from abb_scraper.nextdata import faq_pairs, flight_payload
 
 FIXTURES = Path("fixtures/raw")
@@ -175,12 +175,30 @@ def test_extract_page_carries_the_faq_into_the_document_text() -> None:
     assert any(q in line and a in line for line in page.text.split("\n"))
 
 
+def test_faq_answer_missing_from_dom_is_still_recovered_even_when_question_is_rendered() -> None:
+    """15 live pages server-render the accordion's question triggers but never
+    their answers -- the answer exists only in the flight payload. The old
+    question-keyed skip mistook "question already in DOM" for "pair already
+    in DOM" and discarded the pair, answer included: 76 pairs / 25,903 chars
+    lost across 19 pages, every one of them losing every answer it had
+    (task-14c-fix2-brief.md, measured 2026-09-14 on the 550-file raw cache).
+    """
+    html = push(record(item("Nə vaxt bağlanır?", "<p>Ayın sonunda.</p>")))
+    dom = [Block("Nə vaxt bağlanır?", "p")]  # question rendered server-side; answer is not
+
+    assert faq_blocks(html, dom, PATH) == [Block("Nə vaxt bağlanır? Ayın sonunda.", FAQ_TAG)]
+
+
 def test_faq_item_already_rendered_in_the_dom_is_not_appended_twice() -> None:
+    """The skip still has a job on the rare page that server-renders the
+    answer text too (measured: 1/581 answers present as a full string, 4 as
+    a 60-char prefix) -- otherwise the fix would just delete the dedupe.
+    """
     html = (FIXTURES / "nagd-kredit.html").read_text(encoding="utf-8")
     dom, _ = content_blocks(html, NAGD_KREDIT)
-    q, _ = faq_pairs(html, NAGD_KREDIT)[0]
+    q, a = faq_pairs(html, NAGD_KREDIT)[0]
 
-    seeded = [*dom, Block(q, "p")]
+    seeded = [*dom, Block(a, "p")]
     assert not [b for b in faq_blocks(html, seeded, NAGD_KREDIT) if b.text.startswith(q)]
     assert [b for b in faq_blocks(html, dom, NAGD_KREDIT) if b.text.startswith(q)]
 
