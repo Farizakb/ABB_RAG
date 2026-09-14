@@ -6,6 +6,7 @@ import re
 from typing import NamedTuple
 from urllib.parse import urlparse
 
+from abb_scraper.nextdata import faq_pairs
 from selectolax.parser import HTMLParser, Node
 
 BLOCK_TAGS = {"p", "h1", "h2", "h3", "h4", "li", "td", "th", "dd", "dt", "span", "div", "a"}
@@ -167,6 +168,26 @@ def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
     return blocks, crumbs
 
 
+FAQ_TAG = "faq"
+
+
+def faq_blocks(html: str, dom_blocks: list[Block]) -> list[Block]:
+    """The page's own accordion Q&A, recovered from the Next.js flight payload
+    (see `nextdata.faq_pairs`), as one block per item.
+
+    Question and answer share a single block on purpose: `chunk_document`
+    splits on line boundaries, so a question emitted as its own block can be
+    packed into the previous chunk and stranded from its answer.
+
+    Items whose question already appears in the served DOM are skipped -- a
+    minority of pages render the accordion server-side as well, and the
+    combined "Q A" block would not collapse against the DOM's separate
+    question and answer blocks in `dedupe_blocks`.
+    """
+    present = "\n".join(b.text for b in dom_blocks)
+    return [Block(f"{q} {a}", FAQ_TAG) for q, a in faq_pairs(html) if q not in present]
+
+
 class PageText(NamedTuple):
     text: str
     crumbs: list[str]
@@ -256,6 +277,7 @@ def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageTe
     """
     path = urlparse(url).path or "/"
     blocks, crumbs = content_blocks(html, path)
+    blocks = blocks + faq_blocks(html, blocks)
     kept, collapsed = dedupe_blocks(blocks)
     if not title or not meta:
         fallback_title, fallback_meta = page_meta(html)

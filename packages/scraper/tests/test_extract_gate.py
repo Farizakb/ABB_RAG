@@ -8,6 +8,7 @@ from abb_scraper.extract import (
     content_blocks,
     dedupe_blocks,
     extract_page,
+    faq_blocks,
 )
 
 RAW = Path("fixtures/raw")
@@ -96,7 +97,7 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
     same joined body string, before `if p` filtering can drop it. This is a
     standing check across all fixtures in fixtures/raw/ (stub-empty.html
     included) that `page.body` always equals the real joined block text --
-    independently re-derived here straight from content_blocks +
+    independently re-derived here straight from content_blocks + faq_blocks +
     dedupe_blocks (the same path extract_page itself takes to build `body`),
     rather than trusting extract_page's own value against itself.
 
@@ -117,6 +118,7 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
         # `body`, called separately here) rather than trusting pg.body
         # against itself.
         blocks, _ = content_blocks(html, path.stem)
+        blocks = blocks + faq_blocks(html, blocks)
         kept, _ = dedupe_blocks(blocks)
         actual_body = "\n".join(b.text for b in kept)
 
