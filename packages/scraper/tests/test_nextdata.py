@@ -41,7 +41,7 @@ def record(items: str, url: str = PATH, parent: str = "") -> str:
     )
 
 
-def test_nagd_kredit_faq_is_recovered_and_is_not_in_the_dom():
+def test_nagd_kredit_faq_is_recovered_and_is_not_in_the_dom() -> None:
     """The page the whole extraction pipeline was derived from carries a
     "Nağd kredit haqqında sual-cavab" accordion that never reaches the DOM.
     """
@@ -60,7 +60,7 @@ def test_nagd_kredit_faq_is_recovered_and_is_not_in_the_dom():
     assert "<" not in answer
 
 
-def test_an_ancestors_faq_is_not_attributed_to_its_child_page():
+def test_an_ancestors_faq_is_not_attributed_to_its_child_page() -> None:
     """The payload nests the whole parent chain, and each ancestor carries its
     own sections. `nagd-kredit`'s payload therefore contains the five questions
     that belong to the `/ferdi/kreditler` listing page -- which `nagd-kredit`
@@ -77,7 +77,7 @@ def test_an_ancestors_faq_is_not_attributed_to_its_child_page():
     assert parent_question in {q for q, _ in faq_pairs(parent, KREDITLER)}
 
 
-def test_a_page_whose_record_cannot_be_identified_contributes_nothing():
+def test_a_page_whose_record_cannot_be_identified_contributes_nothing() -> None:
     """Attribution is the whole point: a payload carrying several pages, none
     of them this URL, must yield nothing rather than everything it holds."""
     html = push(
@@ -87,7 +87,7 @@ def test_a_page_whose_record_cannot_be_identified_contributes_nothing():
     assert faq_pairs(html, "/some/other/page") == []
 
 
-def test_a_redirect_alias_falls_back_to_the_single_page_record_served():
+def test_a_redirect_alias_falls_back_to_the_single_page_record_served() -> None:
     """`ferdi/kartlar/debet-kartlari/abb-miles` redirects to the canonical
     card page, so the fetched URL never appears in the payload. One record
     means one page, and it is the page that was served."""
@@ -95,7 +95,7 @@ def test_a_redirect_alias_falls_back_to_the_single_page_record_served():
     assert faq_pairs(html, "/ferdi/alias") == [("Sual?", "Cavab.")]
 
 
-def test_item_split_across_two_pushes_is_recovered():
+def test_item_split_across_two_pushes_is_recovered() -> None:
     """A single flight row is routinely cut in half between two pushes; the
     payload must be concatenated before it is scanned.
     """
@@ -105,7 +105,7 @@ def test_item_split_across_two_pushes_is_recovered():
     assert faq_pairs(push(row[:cut], row[cut:]), PATH) == expected
 
 
-def test_referenced_answer_is_sliced_by_utf8_bytes_not_characters():
+def test_referenced_answer_is_sliced_by_utf8_bytes_not_characters() -> None:
     """`$36` answers point at a `36:T<hex>,` row whose length is in UTF-8
     bytes. Azerbaijani text has more bytes than characters, so a character
     slice over-reads into whatever the stream emits next. The row lives
@@ -118,7 +118,7 @@ def test_referenced_answer_is_sliced_by_utf8_bytes_not_characters():
     assert faq_pairs(html, PATH) == [("Şərtlər", "Şərtlər əlverişlidir.")]
 
 
-def test_reference_row_not_at_line_start_is_still_resolved():
+def test_reference_row_not_at_line_start_is_still_resolved() -> None:
     """Observed on biznes/**/kocurmeler: the referenced row follows the
     previous row's body on the same line (`...</p>3a:Ta6c,<p>...`).
     """
@@ -128,7 +128,7 @@ def test_reference_row_not_at_line_start_is_still_resolved():
     assert faq_pairs(html, PATH) == [("Məlumat", "Sened teleb olunur.")]
 
 
-def test_placeholder_unresolvable_and_duplicate_items_are_dropped():
+def test_placeholder_unresolvable_and_duplicate_items_are_dropped() -> None:
     html = push(
         record(
             ",".join(
@@ -144,7 +144,7 @@ def test_placeholder_unresolvable_and_duplicate_items_are_dropped():
     assert faq_pairs(html, PATH) == [("Qiymət?", "5 AZN")]
 
 
-def test_word_split_across_inline_spans_is_not_shattered():
+def test_word_split_across_inline_spans_is_not_shattered() -> None:
     """Much of this content is pasted from Word, which wraps single
     Azerbaijani characters in their own <span>. A per-text-node separator
     turns "çox" into "ç ox".
@@ -153,7 +153,7 @@ def test_word_split_across_inline_spans_is_not_shattered():
     assert faq_pairs(html, PATH) == [("Sual?", "çox hallarda ikinci")]
 
 
-def test_a_brace_inside_answer_text_does_not_end_the_record():
+def test_a_brace_inside_answer_text_does_not_end_the_record() -> None:
     """The record span is found by brace matching, so a `{` in the content --
     ABB ships validation templates like "Yanlış {validation}" -- must not be
     counted when it sits inside a JSON string.
@@ -164,7 +164,7 @@ def test_a_brace_inside_answer_text_does_not_end_the_record():
     assert faq_pairs(html, PATH) == [("Sual?", "Yanlış {validation} }}")]
 
 
-def test_extract_page_carries_the_faq_into_the_document_text():
+def test_extract_page_carries_the_faq_into_the_document_text() -> None:
     html = (FIXTURES / "nagd-kredit.html").read_text(encoding="utf-8")
     page = extract_page(html, f"https://abb-bank.az{NAGD_KREDIT}")
 
@@ -175,7 +175,7 @@ def test_extract_page_carries_the_faq_into_the_document_text():
     assert any(q in line and a in line for line in page.text.split("\n"))
 
 
-def test_faq_item_already_rendered_in_the_dom_is_not_appended_twice():
+def test_faq_item_already_rendered_in_the_dom_is_not_appended_twice() -> None:
     html = (FIXTURES / "nagd-kredit.html").read_text(encoding="utf-8")
     dom, _ = content_blocks(html, NAGD_KREDIT)
     q, _ = faq_pairs(html, NAGD_KREDIT)[0]
@@ -185,6 +185,6 @@ def test_faq_item_already_rendered_in_the_dom_is_not_appended_twice():
     assert [b for b in faq_blocks(html, dom, NAGD_KREDIT) if b.text.startswith(q)]
 
 
-def test_page_without_flight_payload_yields_nothing():
+def test_page_without_flight_payload_yields_nothing() -> None:
     assert flight_payload("<html><body><p>salam</p></body></html>") == ""
     assert faq_pairs("<html><body><p>salam</p></body></html>", PATH) == []
