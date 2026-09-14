@@ -34,7 +34,7 @@ TEST_DIM = 8
 
 
 def _reachable(url: str) -> str:
-    """Rewrite an unresolvable host to `localhost`.
+    """Rewrite an unreachable host to `127.0.0.1`.
 
     `settings.database_url` defaults to `postgresql://abb:abb@db:5432/abb`,
     where `db` is the compose SERVICE NAME. It resolves inside the compose
@@ -45,8 +45,19 @@ def _reachable(url: str) -> str:
     it was watched, skipped everywhere it was used.
 
     P70 published 5432 on the host for exactly this reason. Deciding on
-    resolvability rather than on an env var keeps ONE default correct in both
-    places: inside the container `db` resolves and is used unchanged.
+    reachability rather than on an env var keeps ONE default correct in both
+    places: inside the container `db` connects and is used unchanged.
+
+    This used to decide on DNS resolvability (`socket.getaddrinfo` raising
+    `socket.gaierror`), which is the wrong predicate: a corporate network's
+    DNS search suffix or wildcard can resolve `db` anyway.
+    `socket.getaddrinfo("db", None)` on this machine returns
+    `[('13.248.169.48', 0), ('76.223.54.146', 0)]` -- two public IPs that
+    obviously are not the compose network -- so the old check never fired,
+    psycopg tried to connect to a public IP on port 5432, timed out, and 20
+    database-dependent tests skipped instead of running. A resolvable-but-
+    unreachable host is the normal case here, so the predicate has to be
+    "can I connect", not "does the name resolve".
 
     The replacement is `127.0.0.1`, not `localhost`: compose publishes the
     port on `127.0.0.1` only, while `localhost` resolves to `::1` first on
@@ -58,9 +69,11 @@ def _reachable(url: str) -> str:
     host = parts.hostname
     if not host:
         return url
+    port = parts.port or 5432
     try:
-        socket.getaddrinfo(host, None)
-    except socket.gaierror:
+        with socket.create_connection((host, port), timeout=1):
+            pass
+    except OSError:
         return urlunsplit(
             (
                 parts.scheme,
@@ -75,8 +88,8 @@ def _reachable(url: str) -> str:
 
 def _test_database_url() -> str:
     """`$TEST_DATABASE_URL` if set, else `settings.database_url` with `_test`
-    appended to the database name and an unresolvable host rewritten to
-    localhost (P68, and see `_reachable`)."""
+    appended to the database name and an unreachable host rewritten to
+    `127.0.0.1` (P68, and see `_reachable`)."""
     env_url = os.environ.get("TEST_DATABASE_URL")
     if env_url:
         return env_url
