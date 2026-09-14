@@ -1,4 +1,7 @@
 # services/rag/conftest.py
+# ruff: noqa: RUF001 -- genuine Azerbaijani fixture text (dotless-i and
+# friends) in seeded_corpus; see services/rag/tests/test_chunking.py for the
+# same convention.
 """The `db` fixture used by every ingest test.
 
 Deliberately does NOT touch the dev database (P68): that database is migrated
@@ -21,6 +24,9 @@ import app.db as db_module
 import psycopg
 import pytest
 from app.config import settings
+from app.embedder import FakeEmbedder
+from app.ingest import ingest_corpus
+from contracts.models import Corpus, Document, Fact
 from psycopg_pool import ConnectionPool
 
 MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "migrations" / "001_schema.sql"
@@ -142,3 +148,160 @@ def db(_test_pool: ConnectionPool) -> Iterator[psycopg.Connection]:
     with db_module.pool.connection() as conn:
         conn.autocommit = True  # sees rows committed by ingest_corpus on another pooled conn
         yield conn
+
+
+@pytest.fixture
+def seeded_corpus(db: psycopg.Connection) -> str:
+    """P80: the brief's test_retrieval.py takes this fixture for granted but
+    never defines it. Lives here, not in test_retrieval.py, because Task 20
+    (generation) will need the same seeded data.
+
+    Depends on `db` (not `_test_pool`) so TRUNCATE runs before ingest, giving
+    a clean, deterministic corpus regardless of test order.
+
+    - one chunk per document (each doc's text is a single line, so
+      chunk_document never splits it), and 12 documents -- comfortably above
+      both k_candidates=20 (so `candidates` is never truncated: every chunk
+      is a candidate) and k_prompt=5, so a test asserting `len(sources) <= 5`
+      is pinning a real cap, not an artifact of too little data. See the
+      task report for the measured cosine-score distribution these 12
+      documents produce under FakeEmbedder (ruling P82).
+    - facts on three documents (nagd-kredit, avtokredit, biznes-kredit) so
+      test_governed_facts_travel_with_their_source has something to find.
+    - https://abb-bank.az/ferdi/kreditler is the parent listing of
+      .../nagd-kredit, .../avtokredit, .../ipoteka and .../kart-kredit;
+      https://abb-bank.az/kampaniyalar is the parent of two campaign pages.
+      Both parents are themselves documents in the corpus, so
+      listing_url_for's trim branch is exercised against a URL that was
+      actually fetched, not merely a plausible one (invariant 12).
+    - https://abb-bank.az/filiallar is a single-segment page with no child in
+      this corpus, covering the "top-level page is its own listing" case
+      end-to-end (test_every_source_carries_a_listing_url_derived_from_its_own_url).
+    """
+    docs = [
+        Document(
+            url="https://abb-bank.az/ferdi/kreditler",
+            title="Fərdi kreditlər",
+            section_path=["Fərdi"],
+            source_class="index",
+            text="Bank fərdi müştərilərə müxtəlif növ kreditlər təklif edir.",
+            content_hash="sha256:seed-kreditler",
+        ),
+        Document(
+            url="https://abb-bank.az/ferdi/kreditler/nagd-kredit",
+            title="Nağd kredit",
+            section_path=["Fərdi", "Kreditlər"],
+            source_class="product",
+            text="Nağd kredit məbləği maksimum 20000 AZN-dək təşkil edir.",
+            content_hash="sha256:seed-nagd-kredit",
+            facts=[
+                Fact(
+                    attribute="max_amount",
+                    value_num=20000,
+                    unit="AZN",
+                    raw_fragment="20 000 AZN-dək",
+                    source_url="https://abb-bank.az/ferdi/kreditler/nagd-kredit",
+                )
+            ],
+        ),
+        Document(
+            url="https://abb-bank.az/ferdi/kreditler/avtokredit",
+            title="Avtokredit",
+            section_path=["Fərdi", "Kreditlər"],
+            source_class="product",
+            text="Avtokredit məbləği maksimum 50000 AZN-dək təşkil edir.",
+            content_hash="sha256:seed-avtokredit",
+            facts=[
+                Fact(
+                    attribute="max_amount",
+                    value_num=50000,
+                    unit="AZN",
+                    raw_fragment="50 000 AZN-dək",
+                    source_url="https://abb-bank.az/ferdi/kreditler/avtokredit",
+                )
+            ],
+        ),
+        Document(
+            url="https://abb-bank.az/ferdi/kreditler/ipoteka",
+            title="İpoteka krediti",
+            section_path=["Fərdi", "Kreditlər"],
+            source_class="product",
+            text="İpoteka krediti mənzil almaq üçün istifadə olunur.",
+            content_hash="sha256:seed-ipoteka",
+        ),
+        Document(
+            url="https://abb-bank.az/ferdi/kreditler/kart-kredit",
+            title="Kart krediti",
+            section_path=["Fərdi", "Kreditlər"],
+            source_class="product",
+            text="Kart krediti gündəlik xərclər üçün nəzərdə tutulub.",
+            content_hash="sha256:seed-kart-kredit",
+        ),
+        Document(
+            url="https://abb-bank.az/kampaniyalar",
+            title="Kampaniyalar",
+            section_path=["Kampaniyalar"],
+            source_class="index",
+            text="Bankın cari kampaniyalarının siyahısı burada yerləşir.",
+            content_hash="sha256:seed-kampaniyalar",
+        ),
+        Document(
+            url="https://abb-bank.az/kampaniyalar/yay-kampaniyasi",
+            title="Yay kampaniyası",
+            section_path=["Kampaniyalar"],
+            source_class="campaign",
+            text="Yay kampaniyası çərçivəsində kredit faizləri endirilib.",
+            content_hash="sha256:seed-yay-kampaniyasi",
+        ),
+        Document(
+            url="https://abb-bank.az/kampaniyalar/qis-kampaniyasi",
+            title="Qış kampaniyası",
+            section_path=["Kampaniyalar"],
+            source_class="campaign",
+            text="Qış kampaniyası müddətində əlavə bonuslar təklif olunur.",
+            content_hash="sha256:seed-qis-kampaniyasi",
+        ),
+        Document(
+            url="https://abb-bank.az/biznes/kreditler/biznes-kredit",
+            title="Biznes krediti",
+            section_path=["Biznes", "Kreditlər"],
+            source_class="product",
+            text="Biznes krediti məbləği maksimum 200000 AZN-dək təşkil edir.",
+            content_hash="sha256:seed-biznes-kredit",
+            facts=[
+                Fact(
+                    attribute="max_amount",
+                    value_num=200000,
+                    unit="AZN",
+                    raw_fragment="200 000 AZN-dək",
+                    source_url="https://abb-bank.az/biznes/kreditler/biznes-kredit",
+                )
+            ],
+        ),
+        Document(
+            url="https://abb-bank.az/biznes/kreditler/lizinq",
+            title="Lizinq",
+            section_path=["Biznes", "Kreditlər"],
+            source_class="product",
+            text="Lizinq xidməti avadanlıq alışı üçün istifadə olunur.",
+            content_hash="sha256:seed-lizinq",
+        ),
+        Document(
+            url="https://abb-bank.az/haqqimizda",
+            title="Haqqımızda",
+            section_path=["Haqqımızda"],
+            source_class="corporate",
+            text="Bank 1992-ci ildən etibarən fəaliyyət göstərir.",
+            content_hash="sha256:seed-haqqimizda",
+        ),
+        Document(
+            url="https://abb-bank.az/filiallar",
+            title="Filiallar",
+            section_path=["Filiallar"],
+            source_class="corporate",
+            text="Bankın filial şəbəkəsi ölkə üzrə geniş yayılıb.",
+            content_hash="sha256:seed-filiallar",
+        ),
+    ]
+    corpus = Corpus(documents=docs)
+    return ingest_corpus(corpus, FakeEmbedder(dim=8))
