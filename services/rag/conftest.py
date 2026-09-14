@@ -12,6 +12,7 @@ tests, not hide from them -- no hand-written duplicate CREATE TABLE).
 from __future__ import annotations
 
 import os
+import socket
 from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -26,15 +27,58 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "migrations" / "00
 TEST_DIM = 8
 
 
+def _reachable(url: str) -> str:
+    """Rewrite an unresolvable host to `localhost`.
+
+    `settings.database_url` defaults to `postgresql://abb:abb@db:5432/abb`,
+    where `db` is the compose SERVICE NAME. It resolves inside the compose
+    network and nowhere else -- so on the host, which is where
+    `pytest services/rag` is actually run, the P68 fallback dialled a name
+    that does not exist and every test in this file skipped. CI never showed
+    it, because CI sets `DATABASE_URL` to localhost itself: green everywhere
+    it was watched, skipped everywhere it was used.
+
+    P70 published 5432 on the host for exactly this reason. Deciding on
+    resolvability rather than on an env var keeps ONE default correct in both
+    places: inside the container `db` resolves and is used unchanged.
+
+    The replacement is `127.0.0.1`, not `localhost`: compose publishes the
+    port on `127.0.0.1` only, while `localhost` resolves to `::1` first on
+    Windows. Every connection then pays a ~5s failed IPv6 attempt before
+    falling back, which a direct connect survives and `ConnectionPool`'s
+    background workers do not -- they time out and the pool never fills.
+    """
+    parts = urlsplit(url)
+    host = parts.hostname
+    if not host:
+        return url
+    try:
+        socket.getaddrinfo(host, None)
+    except socket.gaierror:
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc.replace(host, "127.0.0.1", 1),
+                parts.path,
+                parts.query,
+                parts.fragment,
+            )
+        )
+    return url
+
+
 def _test_database_url() -> str:
     """`$TEST_DATABASE_URL` if set, else `settings.database_url` with `_test`
-    appended to the database name (P68)."""
+    appended to the database name and an unresolvable host rewritten to
+    localhost (P68, and see `_reachable`)."""
     env_url = os.environ.get("TEST_DATABASE_URL")
     if env_url:
         return env_url
     parts = urlsplit(settings.database_url)
     dbname = parts.path.lstrip("/")
-    return urlunsplit((parts.scheme, parts.netloc, f"/{dbname}_test", parts.query, parts.fragment))
+    return _reachable(
+        urlunsplit((parts.scheme, parts.netloc, f"/{dbname}_test", parts.query, parts.fragment))
+    )
 
 
 def _maintenance_url(test_url: str) -> str:
