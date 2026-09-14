@@ -169,7 +169,6 @@ def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
 
 
 FAQ_TAG = "faq"
-FAQ_DEDUPE_PREFIX = 60
 
 
 def faq_blocks(html: str, dom_blocks: list[Block], url_path: str) -> list[Block]:
@@ -184,19 +183,29 @@ def faq_blocks(html: str, dom_blocks: list[Block], url_path: str) -> list[Block]
     splits on line boundaries, so a question emitted as its own block can be
     packed into the previous chunk and stranded from its answer.
 
-    The skip keys on the ANSWER, not the question: many pages server-render
-    the accordion's question triggers but never its answers, so a
-    question-keyed skip discarded 76 pairs (25,903 chars) across 19 pages --
-    every answer on each of them. Measured 2026-09-14 on the 550-file raw
-    cache; see RECON.md §11.2. A prefix (not the full answer) is compared so
-    that trivial whitespace/markup differences between the flight text and
-    the DOM flattening do not defeat a genuine duplicate.
+    The skip fires only when BOTH the question and the FULL answer are
+    already present in the DOM text -- not the answer alone, and not a
+    prefix of it. A question-keyed skip discarded 76 pairs (25,903 chars)
+    across 19 pages: many pages server-render the accordion's question
+    triggers but never their answers (task-14c-fix2-brief.md, measured
+    2026-09-14 on the 550-file raw cache). Re-keying on the answer's first 60
+    characters fixed that but broke 3 different pages the same way: a DOM
+    teaser that shares the answer's opening clause matched the prefix while
+    the full answer was never rendered at all, so the same class of silent
+    deletion recurred (task-14c-fix3-brief.md, same measurement date).
+    Corpus-wide, requiring the full question AND the full answer drops zero
+    pairs today -- no ABB page currently server-renders a complete accordion
+    item -- and that is correct; the guard stays because a page that does
+    render one must not be duplicated. `_clean` collapses whitespace on both
+    sides of the comparison: the flight text and the DOM flattening differ in
+    whitespace, and that difference is the only reason a prefix was ever
+    reached for.
     """
-    present = "\n".join(b.text for b in dom_blocks)
+    present = _clean("\n".join(b.text for b in dom_blocks))
     return [
         Block(f"{q} {a}", FAQ_TAG)
         for q, a in faq_pairs(html, url_path)
-        if a[:FAQ_DEDUPE_PREFIX] not in present
+        if not (_clean(q) in present and _clean(a) in present)
     ]
 
 

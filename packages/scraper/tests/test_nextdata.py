@@ -189,18 +189,40 @@ def test_faq_answer_missing_from_dom_is_still_recovered_even_when_question_is_re
     assert faq_blocks(html, dom, PATH) == [Block("Nə vaxt bağlanır? Ayın sonunda.", FAQ_TAG)]
 
 
-def test_faq_item_already_rendered_in_the_dom_is_not_appended_twice() -> None:
-    """The skip still has a job on the rare page that server-renders the
-    answer text too (measured: 1/581 answers present as a full string, 4 as
-    a 60-char prefix) -- otherwise the fix would just delete the dedupe.
+def test_faq_item_fully_rendered_in_the_dom_is_not_appended_twice() -> None:
+    """The skip still has a job when a page server-renders a COMPLETE
+    accordion item -- question and full answer both -- otherwise the fix
+    would just delete the dedupe. Measured corpus-wide: 0/581 pairs are
+    dropped by a full-question-AND-full-answer rule today (no ABB page
+    currently server-renders a complete item), but the guard must still fire
+    the day one does.
     """
     html = (FIXTURES / "nagd-kredit.html").read_text(encoding="utf-8")
     dom, _ = content_blocks(html, NAGD_KREDIT)
     q, a = faq_pairs(html, NAGD_KREDIT)[0]
 
-    seeded = [*dom, Block(a, "p")]
+    seeded = [*dom, Block(q, "p"), Block(a, "p")]
     assert not [b for b in faq_blocks(html, seeded, NAGD_KREDIT) if b.text.startswith(q)]
     assert [b for b in faq_blocks(html, dom, NAGD_KREDIT) if b.text.startswith(q)]
+
+
+def test_faq_answer_prefix_rendered_in_dom_is_still_recovered() -> None:
+    """The DOM sometimes carries only a truncated preview of the answer -- a
+    teaser sharing the opening clause -- while the full accordion answer is
+    longer. A prefix-based dedupe (the shipped fix-2 rule) mistakes that
+    teaser for proof the whole answer is already rendered and silently drops
+    the pair: 3 real pages lost their only copy of a genuine answer this way
+    (task-14c-fix3-brief.md, measured 2026-09-14 on the 550-file raw cache).
+    This is the case that is broken today.
+    """
+    answer = (
+        "Kreditin faiz dərəcəsi illik 24%-dən başlayır və müddətdən asılı "
+        "olaraq dəyişə bilər, konkret məbləğ üçün filiala müraciət edin."
+    )
+    html = push(record(item("Faiz dərəcəsi nə qədərdir?", f"<p>{answer}</p>")))
+    dom = [Block(answer[:60], "p")]  # DOM renders only a teaser/prefix, not the full answer
+
+    assert faq_blocks(html, dom, PATH) == [Block(f"Faiz dərəcəsi nə qədərdir? {answer}", FAQ_TAG)]
 
 
 def test_page_without_flight_payload_yields_nothing() -> None:
