@@ -7,9 +7,11 @@ from fastapi import FastAPI
 
 from app.config import settings
 from app.db import get_conn
+from app.routes import router
 
 log = logging.getLogger("rag")
 app = FastAPI(title="ABB Assistant — rag")
+app.include_router(router)
 
 
 @app.get("/healthz")
