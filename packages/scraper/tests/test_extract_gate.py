@@ -118,7 +118,7 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
         # `body`, called separately here) rather than trusting pg.body
         # against itself.
         blocks, _ = content_blocks(html, path.stem)
-        blocks = blocks + faq_blocks(html, blocks)
+        blocks = blocks + faq_blocks(html, blocks, path.stem)
         kept, _ = dedupe_blocks(blocks)
         actual_body = "\n".join(b.text for b in kept)
 

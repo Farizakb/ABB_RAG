@@ -171,9 +171,13 @@ def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
 FAQ_TAG = "faq"
 
 
-def faq_blocks(html: str, dom_blocks: list[Block]) -> list[Block]:
+def faq_blocks(html: str, dom_blocks: list[Block], url_path: str) -> list[Block]:
     """The page's own accordion Q&A, recovered from the Next.js flight payload
     (see `nextdata.faq_pairs`), as one block per item.
+
+    `url_path` is what scopes the payload to THIS page's CMS record: the
+    payload also carries every ancestor route's sections, so an unscoped scan
+    hands a child page the FAQ its parent renders.
 
     Question and answer share a single block on purpose: `chunk_document`
     splits on line boundaries, so a question emitted as its own block can be
@@ -185,7 +189,7 @@ def faq_blocks(html: str, dom_blocks: list[Block]) -> list[Block]:
     question and answer blocks in `dedupe_blocks`.
     """
     present = "\n".join(b.text for b in dom_blocks)
-    return [Block(f"{q} {a}", FAQ_TAG) for q, a in faq_pairs(html) if q not in present]
+    return [Block(f"{q} {a}", FAQ_TAG) for q, a in faq_pairs(html, url_path) if q not in present]
 
 
 class PageText(NamedTuple):
@@ -277,7 +281,7 @@ def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageTe
     """
     path = urlparse(url).path or "/"
     blocks, crumbs = content_blocks(html, path)
-    blocks = blocks + faq_blocks(html, blocks)
+    blocks = blocks + faq_blocks(html, blocks, path)
     kept, collapsed = dedupe_blocks(blocks)
     if not title or not meta:
         fallback_title, fallback_meta = page_meta(html)
