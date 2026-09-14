@@ -3,16 +3,24 @@ from __future__ import annotations
 
 import logging
 
-from contracts.models import Corpus, CorpusStatus
+from contracts.models import AnswerResponse, Corpus, CorpusStatus
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
 from app.db import get_conn
 from app.embedder import Embedder, OpenAIEmbedder
+from app.generate import OpenAIClient
+from app.generate import answer as generate_answer
 from app.ingest import STALE_PROCESSING_AFTER, ingest_corpus  # P74: one timeout constant
 
 log = logging.getLogger("rag")
 router = APIRouter(prefix="/api/v1")
+# P90: the brief wrote `@router.post("/../answer", ...)` on the `/api/v1`-prefixed
+# router above, which resolves to the nonsense path `/api/v1/../answer` -- while
+# its own prose said to register `POST /answer` on the bare app. The prose is
+# right: a second, un-prefixed router, included directly in main.py, internal
+# only, never routed through nginx.
+internal_router = APIRouter()
 
 
 class UploadRequest(BaseModel):
@@ -96,3 +104,13 @@ def status(corpus_id: str) -> CorpusStatus:
         embedding_model=model,
         error=error,
     )
+
+
+class AnswerRequest(BaseModel):
+    corpus_id: str
+    question: str
+
+
+@internal_router.post("/answer", response_model=AnswerResponse, include_in_schema=False)
+def answer_route(req: AnswerRequest) -> AnswerResponse:
+    return generate_answer(req.corpus_id, req.question, OpenAIEmbedder(), OpenAIClient())
