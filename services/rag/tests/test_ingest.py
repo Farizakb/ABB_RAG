@@ -1,10 +1,12 @@
 # services/rag/tests/test_ingest.py
+from datetime import timedelta
 from typing import Any
 
+import app.db as db_module
 import psycopg
 import pytest
 from app.embedder import FakeEmbedder
-from app.ingest import ingest_corpus
+from app.ingest import STALE_PROCESSING_AFTER, ingest_corpus
 from contracts.models import Corpus, Document, Fact
 
 
@@ -32,14 +34,22 @@ def corpus(n: int = 2) -> Corpus:
     )
 
 
-def _seed_corpus_row(db: psycopg.Connection, content_hash: str, model: str, status: str) -> None:
+def _seed_corpus_row(
+    db: psycopg.Connection,
+    content_hash: str,
+    model: str,
+    status: str,
+    age: timedelta = timedelta(0),
+) -> None:
     """Plants a corpora row as if a previous ingest attempt had reached
-    `status` and then stalled, without going through ingest_corpus."""
+    `status` and then stalled, without going through ingest_corpus. `age`
+    backdates updated_at so P72's staleness check can be exercised (default:
+    just now, i.e. fresh)."""
     db.execute(
         "INSERT INTO rag.corpora (id, content_hash, manifest, status, stage, "
-        "embedding_model, embedding_version) "
-        "VALUES (gen_random_uuid(), %s, '{}', %s, 'embedding', %s, 1)",
-        (content_hash, status, model),
+        "embedding_model, embedding_version, updated_at) "
+        "VALUES (gen_random_uuid(), %s, '{}', %s, 'embedding', %s, 1, now() - %s)",
+        (content_hash, status, model, age),
     )
 
 
@@ -103,8 +113,10 @@ def test_a_failed_corpus_is_retried_and_ends_ready(db: Any) -> None:
 
 
 def test_a_processing_corpus_is_not_re_ingested(db: Any) -> None:
-    """P66: only `failed` rows are retried. A `processing` row means another
-    ingest is already in flight — re-ingesting concurrently would race it."""
+    """P66/P72: a FRESH `processing` row means another ingest is already in
+    flight — re-ingesting concurrently would race it. Pins the opposite
+    direction from test_a_stale_processing_corpus_is_retried_and_ends_ready so
+    neither test is vacuous."""
     c = corpus(1)
     embedder = FakeEmbedder(dim=8)
     _seed_corpus_row(db, c.corpus_id, embedder.model, status="processing")
@@ -113,3 +125,107 @@ def test_a_processing_corpus_is_not_re_ingested(db: Any) -> None:
 
     assert db.execute("SELECT count(*) FROM rag.documents").fetchone()[0] == 0
     assert db.execute("SELECT count(*) FROM rag.chunks").fetchone()[0] == 0
+
+
+def test_a_stale_processing_corpus_is_retried_and_ends_ready(db: Any) -> None:
+    """P72: a `processing` row whose updated_at heartbeat has gone silent for
+    longer than STALE_PROCESSING_AFTER means the ingest that owned it crashed.
+    SPEC §6.3's retry promise must reach these rows too, not just ones already
+    marked `failed` -- otherwise a crash mid-ingest wedges the corpus forever."""
+    c = corpus(1)
+    embedder = FakeEmbedder(dim=8)
+    _seed_corpus_row(
+        db,
+        c.corpus_id,
+        embedder.model,
+        status="processing",
+        age=STALE_PROCESSING_AFTER + timedelta(seconds=1),
+    )
+    old_id = db.execute(
+        "SELECT id FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
+        (c.corpus_id, embedder.model),
+    ).fetchone()[0]
+
+    ingest_corpus(c, embedder)
+
+    rows = db.execute(
+        "SELECT id, status FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
+        (c.corpus_id, embedder.model),
+    ).fetchall()
+    assert len(rows) == 1
+    new_id, status = rows[0]
+    assert status == "ready"
+    assert new_id != old_id
+
+
+def test_product_slug_is_derived_from_the_url_path_not_the_title(db: Any) -> None:
+    """P73: product_facts.product_slug must be a slug -- Task 18's golden set
+    and the SPEC §7.3 fact-governance path both read it as one. Derived from
+    the final non-empty URL path segment (trailing slash/query/fragment
+    ignored), falling back to the title when the URL has no usable segment."""
+    c = Corpus(
+        documents=[
+            Document(
+                url="https://abb-bank.az/kredit/avtokredit/?utm=x#top",
+                title="Avtokredit",
+                section_path=["Fərdi"],
+                source_class="product",
+                text="mətn " * 200,
+                content_hash="sha256:slug-a",
+                facts=[Fact(attribute="max_amount", value_num=1, raw_fragment="1")],
+            ),
+            Document(
+                url="https://abb-bank.az",
+                title="Bare Origin Title",
+                section_path=["Fərdi"],
+                source_class="product",
+                text="mətn " * 200,
+                content_hash="sha256:slug-b",
+                facts=[Fact(attribute="max_amount", value_num=1, raw_fragment="1")],
+            ),
+        ]
+    )
+
+    ingest_corpus(c, FakeEmbedder(dim=8))
+
+    slugs = {
+        r[0] for r in db.execute("SELECT product_slug FROM rag.product_facts ORDER BY product_slug")
+    }
+    assert slugs == {"avtokredit", "Bare Origin Title"}
+
+
+class _StageObserver:
+    """P67 (MAJOR 1): a fake embedder whose embed() opens its OWN pooled
+    connection (a second, independent connection to the same test database)
+    and reads the corpus row's committed `stage` -- proving the 'embedding'
+    transition was actually committed and visible from outside ingest_corpus's
+    own transaction before the (potentially slow) embed call runs, not merely
+    written and left pending until the ingest finishes."""
+
+    def __init__(self, content_hash: str, dim: int = 8, model: str = "stage-observer") -> None:
+        self.dim = dim
+        self.model = model
+        self._content_hash = content_hash
+        self.observed_stage: str | None = None
+
+    def embed(self, texts: list[str]) -> Any:
+        with db_module.pool.connection() as conn:
+            conn.autocommit = True
+            row = conn.execute(
+                "SELECT stage FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
+                (self._content_hash, self.model),
+            ).fetchone()
+            self.observed_stage = row[0] if row else None
+        return FakeEmbedder(dim=self.dim, model=self.model).embed(texts)
+
+
+def test_stage_transition_to_embedding_is_committed_before_embed_runs(db: Any) -> None:
+    """P67 (MAJOR 1): stage UPDATEs must commit immediately so a concurrent
+    observer -- Task 17's stall detector -- can see 'embedding' while embed()
+    is still running, not only once the whole ingest finishes."""
+    c = corpus(1)
+    observer = _StageObserver(c.corpus_id)
+
+    ingest_corpus(c, observer)
+
+    assert observer.observed_stage == "embedding"

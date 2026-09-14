@@ -3,13 +3,20 @@ from __future__ import annotations
 
 import json
 import uuid
+from datetime import timedelta
+from urllib.parse import urlsplit
 
 import psycopg
-from contracts.models import Corpus
+from contracts.models import Corpus, Document
 
 from app.chunking import Chunk, chunk_document, tokens_per_char
 from app.db import get_conn
 from app.embedder import Embedder
+
+# P72: how long a `processing` row may go without a stage heartbeat before a
+# new ingest attempt treats it as abandoned rather than in flight. Named here
+# so the call site reads as policy, not an unexplained literal.
+STALE_PROCESSING_AFTER = timedelta(minutes=5)
 
 
 def _schema_dim(conn: psycopg.Connection) -> int:
@@ -22,6 +29,27 @@ def _schema_dim(conn: psycopg.Connection) -> int:
             "rag.chunks.embedding column not found — has the migration been applied?"
         )
     return int(row[0])
+
+
+def _stage(conn: psycopg.Connection, row_id: uuid.UUID, stage: str) -> None:
+    """P67: commits immediately so a concurrent observer sees the stage
+    transition (and its updated_at bump) while the ingest is still running,
+    not only once the whole thing finishes -- Task 17's stall detector and
+    P72's staleness check both depend on this being a live signal."""
+    conn.execute("UPDATE rag.corpora SET stage=%s, updated_at=now() WHERE id=%s", (stage, row_id))
+    conn.commit()
+
+
+def _product_slug(doc: Document) -> str:
+    """P73: product_facts.product_slug must be a slug, not doc.title -- Task
+    18's golden set and the SPEC §7.3 fact-governance path both read this
+    column as one. Derived from the final non-empty path segment of doc.url
+    (a trailing slash, query string, and fragment are ignored), falling back
+    to doc.title when the URL has no usable segment (e.g. a bare origin)."""
+    url: str = doc.url
+    title: str = doc.title
+    segments = [s for s in urlsplit(url).path.split("/") if s]
+    return segments[-1] if segments else title
 
 
 def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
@@ -41,21 +69,23 @@ def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
             )
 
         existing = conn.execute(
-            "SELECT id, status FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
-            (corpus_id, embedder.model),
+            "SELECT id, status, now() - updated_at > %s AS stale "
+            "FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
+            (STALE_PROCESSING_AFTER, corpus_id, embedder.model),
         ).fetchone()
         if existing:
-            existing_id, status = existing
-            if status == "failed":
-                # P66: a stalled/failed attempt (Task 17 marks these) must be
-                # retryable — SPEC §6.3 promises the UI a retry, which a
-                # permanent early-return would make impossible. Cascades
-                # through documents to chunks and product_facts.
+            existing_id, status, stale = existing
+            # P72: a `processing` row with no heartbeat in STALE_PROCESSING_AFTER
+            # means the ingest that owned it crashed -- the retry SPEC §6.3
+            # promises must reach these rows, not just ones already marked
+            # `failed` (P66), or a crash leaves the corpus stuck forever.
+            if status == "failed" or (status == "processing" and stale):
+                # Cascades through documents to chunks and product_facts.
                 conn.execute("DELETE FROM rag.corpora WHERE id = %s", (existing_id,))
                 conn.commit()
             else:
-                # status in {'ready', 'processing'}: already done, or another
-                # ingest is already in flight — either way, don't re-ingest.
+                # status == 'ready', or a FRESH 'processing' row (another
+                # ingest is already in flight) — either way, don't re-ingest.
                 return corpus_id
 
         row_id = uuid.uuid4()
@@ -102,7 +132,7 @@ def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
                         uuid.uuid4(),
                         doc_id,
                         row_id,
-                        doc.title,
+                        _product_slug(doc),
                         fact.attribute,
                         fact.value_num,
                         fact.value_text,
@@ -117,18 +147,11 @@ def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
                 pending.append((doc_id, chunk, doc.source_class))
         conn.commit()
 
-        # P67: stage UPDATEs also bump updated_at -- Task 17's stall detector
-        # reads it as the heartbeat that tells a live ingest from a dead one.
-        conn.execute(
-            "UPDATE rag.corpora SET stage='embedding', updated_at=now() WHERE id=%s", (row_id,)
-        )
-        conn.commit()
+        _stage(conn, row_id, "embedding")
 
         vectors = embedder.embed([c.embed_input for _, c, _ in pending])
 
-        conn.execute(
-            "UPDATE rag.corpora SET stage='indexing', updated_at=now() WHERE id=%s", (row_id,)
-        )
+        _stage(conn, row_id, "indexing")
         for (doc_id, chunk, source_class), vector in zip(pending, vectors, strict=True):
             conn.execute(
                 "INSERT INTO rag.chunks (id, document_id, corpus_id, ord, text, embed_input, "
