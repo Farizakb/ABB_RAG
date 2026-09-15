@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections import Counter
 from typing import NamedTuple
 from urllib.parse import urlparse
 
@@ -215,6 +216,11 @@ class PageText(NamedTuple):
     dup_collapsed: int
     char_count: int
     body: str
+    # The pieces `text` was joined from, kept so `strip_chrome` can drop a piece
+    # and rebuild without re-parsing the HTML. `head` is (title, meta) minus
+    # empties; `block_texts` is the deduped body blocks in order.
+    head: tuple[str, ...] = ()
+    block_texts: tuple[str, ...] = ()
 
 
 def dedupe_blocks(blocks: list[Block]) -> tuple[list[Block], int]:
@@ -250,22 +256,81 @@ def page_meta(html: str) -> tuple[str, str]:
     return title, meta
 
 
-MIN_CHARS = 250  # re-measured corpus-wide over the full 550-page raw cache
-# (2026-09-15), replacing the 400 calibrated on the day-three 243-document crawl.
-# 400 was separating the wrong two populations. The gate counts `char_count` =
-# len(title + meta + body), and ABB's "root stub" pages (SPEC §5.3 rule 3) carry
-# their whole substance in title+meta -- the question in the title, the answer in
-# the description -- above a 117-character boilerplate body that is the same ABB
-# mobile CTA on all 18 of them. At 400 every one of those was dropped:
-# /kredit-borcumu-nece-onlayn-odeye-bilerem, /kommunal-odenisleri-onlayn-nece-etmek-olar,
-# /ipoteka-odenisimi-nece-ede-bilerem and 15 siblings -- 18 of the highest-intent
-# customer questions in the corpus.
-# The two populations actually separate cleanly on char_count:
-#   empty shells (zero content blocks):      190 .. 206   (18 pages)
-#   genuine short pages:                     285 .. 389   (28 pages)
-# 250 sits in the gap with a 44-char margin above the largest shell and a 35-char
-# margin below the smallest genuine page. Ruling P57's constraint -- never let the
-# gate rise past a real page -- is preserved and tightened, not relaxed.
+MIN_CHARS = 100  # measured on CHROME-STRIPPED text over the full 550-page cache
+# (2026-09-15). The gate ran twice before against text that still contained
+# site-wide chrome, which is why it kept mis-calibrating: at 400 it dropped 28
+# genuine pages, and at 250 it still had only a 44-char margin because an empty
+# shell's 190 chars of generic title+description counted toward its size.
+# `strip_chrome` removes that first, and the two populations then separate
+# completely rather than narrowly:
+#   empty shells (chrome and nothing else):     0        (17 pages)
+#   genuine short pages:                      124 .. up  (531 pages)
+# There is no overlap left to trade off, so 100 sits in open space -- well clear
+# of 0, with a 24-char margin below /haqqimizda/siyasetlerimiz at 124, the
+# smallest real page in the corpus. Ruling P57's constraint (never let the gate
+# rise past a real page) holds with far more room than either earlier value.
+
+
+CHROME_MIN_DOCS = 20  # never strip anything in a corpus too small to judge
+CHROME_DOC_FRACTION = 0.15  # ...and only what recurs on 15%+ of the pages
+
+
+def _chrome_key(s: str) -> str:
+    return re.sub(r"\s+", " ", s).strip().lower()
+
+
+def strip_chrome(pages: list[tuple[str, PageText]]) -> tuple[list[tuple[str, PageText]], int]:
+    """Drop title/meta/blocks that recur across the site: chrome rule 1 missed.
+
+    Rule 1 strips chrome structurally (nav, header, footer). ABB also renders
+    site-wide marketing INSIDE the content region, where rule 1 cannot see it:
+    an "ABB mobile" app CTA on 112 of 548 pages, and a generic title/description
+    pair on 349. On a long product page that is noise; on a 287-char root stub
+    it is 41% of the document, and it dominated the embedding -- measured
+    2026-09-15, several stubs were indexed but ranked 6th-13th for the exact
+    question they answer, because their vector described the ABB mobile app
+    rather than paying a utility bill.
+
+    Frequency is counted per PIECE, not per line. A line rule would strip
+    "Müddət" (76 pages) and orphan the "60 ayadək" beside it, since the label
+    repeats but the value does not. A whole block repeated verbatim is chrome;
+    a table whose values differ is not.
+
+    The threshold is a fraction of the corpus with an absolute floor, so a
+    handful of fixture pages in a test never look like a site-wide pattern.
+    Measured at 15% of 548 pages (>=82), exactly six pieces qualify: the generic
+    title and description, "aktiv deyil", and the three CTA blocks. "Müddət" at
+    76 survives, and the largest product page loses only the 117-char CTA.
+
+    Returns the rebuilt pages and the number of pieces removed.
+    """
+    threshold = max(CHROME_MIN_DOCS, int(len(pages) * CHROME_DOC_FRACTION))
+    df: Counter[str] = Counter()
+    for _, p in pages:
+        for k in {_chrome_key(x) for x in p.head + p.block_texts}:
+            df[k] += 1
+
+    out: list[tuple[str, PageText]] = []
+    removed = 0
+    for url, p in pages:
+        head = tuple(x for x in p.head if df[_chrome_key(x)] < threshold)
+        blocks = tuple(x for x in p.block_texts if df[_chrome_key(x)] < threshold)
+        removed += (len(p.head) - len(head)) + (len(p.block_texts) - len(blocks))
+        body = "\n".join(blocks)
+        text = "\n".join(head + blocks)
+        out.append(
+            (
+                url,
+                p._replace(
+                    text=text,
+                    body=body,
+                    char_count=len(text),
+                    head=head,
+                    block_texts=blocks,
+                ),
+            )
+        )
+    return out, removed
 
 
 class DropRecord(NamedTuple):
@@ -334,8 +399,16 @@ def extract_page(html: str, url: str, title: str = "", meta: str = "") -> PageTe
     if not title or not meta:
         fallback_title, fallback_meta = page_meta(html)
         title, meta = title or fallback_title, meta or fallback_meta
-    body = "\n".join(b.text for b in kept)
+    head = tuple(p for p in (title, meta) if p)
+    block_texts = tuple(b.text for b in kept)
+    body = "\n".join(block_texts)
     text = "\n".join(p for p in (title, meta, body) if p)
     return PageText(
-        text=text, crumbs=crumbs, dup_collapsed=collapsed, char_count=len(text), body=body
+        text=text,
+        crumbs=crumbs,
+        dup_collapsed=collapsed,
+        char_count=len(text),
+        body=body,
+        head=head,
+        block_texts=block_texts,
     )

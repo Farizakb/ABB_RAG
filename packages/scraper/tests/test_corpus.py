@@ -215,12 +215,23 @@ def test_non_200_results_are_dropped_with_their_status() -> None:
 # ------------------------------------------------------------------- volatile
 
 
+VOLATILE_TITLE = (
+    "Valyuta Məzənnəsi | Canlı Valyuta konvertoru ABB — nağd və nağdsız alış-satış qiymətləri"
+)
+
+
 def test_volatile_page_is_stored_as_a_pointer_not_full_body() -> None:
-    """SPEC §5.4 pointer mode: title and description only, real body
-    discarded (exchange rates change daily and would go stale in the
-    corpus). The gate still runs against the full, pre-truncation page, so
-    it is quality-gated the same as any other page."""
-    html = page("Valyuta məzənnələri", body_chars=900)
+    """SPEC §5.4 pointer mode: title and description only, real body discarded
+    (exchange rates change daily and would go stale in the corpus).
+
+    The gate now sizes the POINTER, not the pre-truncation page: `strip_chrome`
+    rebuilds `char_count` from the pieces that survive, so a volatile page is
+    quality-gated on what actually reaches the corpus. The real page clears it
+    comfortably -- its own title and description are 202 chars before its FAQ is
+    added -- so the fixture carries a realistically long title rather than a
+    two-word one.
+    """
+    html = page(VOLATILE_TITLE, body_chars=900)
     results = [r("/ferdi/valyuta-mezenneleri", html)]
     corpus, _ = build_corpus(results, TODAY)
     doc = corpus.documents[0]
@@ -269,7 +280,7 @@ def test_volatile_pointer_keeps_its_faq_while_discarding_the_rate_body() -> None
     """
     question = "Valyuta köçürməsinə komissiya tutulurmu?"
     answer = "Xeyr, ABB mobile vasitəsilə edilən ilk köçürmə komissiyasızdır."
-    html = page("Valyuta məzənnələri", body_chars=900).replace(
+    html = page(VOLATILE_TITLE, body_chars=900).replace(
         "</body>", _flight_faq("valyuta-mezenneleri", question, answer) + "</body>"
     )
     corpus, _ = build_corpus([r("/ferdi/valyuta-mezenneleri", html)], TODAY)

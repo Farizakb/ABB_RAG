@@ -1,4 +1,6 @@
 # packages/scraper/tests/test_extract_gate.py
+# ruff: noqa: RUF001 -- the chrome fixtures quote genuine Azerbaijani site copy
+# (dotless-i and friends); same convention as test_nextdata.py.
 from pathlib import Path
 
 from abb_scraper.extract import (
@@ -9,6 +11,7 @@ from abb_scraper.extract import (
     dedupe_blocks,
     extract_page,
     faq_blocks,
+    strip_chrome,
 )
 
 RAW = Path("fixtures/raw")
@@ -25,34 +28,35 @@ def page(text: str, body: str | None = None) -> PageText:
 
 
 def test_gate_sits_in_the_measured_gap_between_shells_and_real_pages() -> None:
-    """SPEC §5.3 rule 5, re-measured over the full 550-page raw cache 2026-09-15.
+    """SPEC §5.3 rule 5, measured on CHROME-STRIPPED text over the full 550-page
+    cache 2026-09-15.
 
-    Two populations, and the gate must fall between them:
-        empty shells (zero content blocks)  190 .. 206   (18 pages)
-        genuine short pages                 285 .. 389   (28 pages)
+    The gate mis-calibrated twice because it was sizing text that still held
+    site-wide chrome: an empty shell's 190 chars were entirely a generic title
+    and description. With `strip_chrome` running first the populations separate
+    completely instead of narrowly:
 
-    The previous 400 was above the TOP of the genuine population, not between
-    them, so it dropped all 28 -- including the 18 root stubs whose whole
-    substance is a customer question in the title and its answer in the meta
-    description. Ruling P57's constraint (never rise past a real page) is what
-    these bounds encode; 400 violated it against the full cache even though it
-    held against the smaller day-three sample it was calibrated on.
+        empty shells (chrome and nothing else)     0        (17 pages)
+        genuine short pages                      124 .. up  (531 pages)
+
+    So the bound below is not a compromise between two overlapping tails; there
+    is open space, and 100 sits in it.
     """
-    assert MIN_CHARS == 250
-    assert MIN_CHARS > 206  # above every measured empty shell, so all 18 still drop
-    assert MIN_CHARS <= 285  # at or below the smallest genuine page, so none is lost
+    assert MIN_CHARS == 100
+    assert MIN_CHARS > 0  # a fully stripped shell must still be dropped
+    assert MIN_CHARS <= 124  # /haqqimizda/siyasetlerimiz, the smallest real page
 
 
-def test_empty_shell_at_the_measured_baseline_is_dropped() -> None:
-    kept, dropped = apply_gates([("https://abb-bank.az/empty", page("x" * 206))])
+def test_fully_stripped_shell_is_dropped() -> None:
+    kept, dropped = apply_gates([("https://abb-bank.az/empty", page(""))])
     assert kept == []
-    assert dropped[0].reason == "under-min-chars" and dropped[0].char_count == 206
+    assert dropped[0].reason == "under-min-chars" and dropped[0].char_count == 0
 
 
 def test_smallest_genuine_page_in_the_measured_population_survives() -> None:
-    """The counterpart to the shell test: 285 chars is the smallest real page in
+    """The counterpart to the shell test: 124 chars is the smallest real page in
     the full-cache measurement and must clear the gate."""
-    kept, _ = apply_gates([("https://abb-bank.az/real", page("x" * 285))])
+    kept, _ = apply_gates([("https://abb-bank.az/real", page("x" * 124))])
     assert len(kept) == 1
 
 
@@ -72,6 +76,56 @@ def test_root_stubs_sharing_a_boilerplate_body_are_not_deduped_into_one() -> Non
     )
     assert [u for u, _ in kept] == ["https://abb-bank.az/kredit", "https://abb-bank.az/komm"]
     assert dropped == []
+
+
+def _pg(head: tuple[str, ...], blocks: tuple[str, ...]) -> PageText:
+    text = "\n".join(head + blocks)
+    return PageText(
+        text=text,
+        crumbs=[],
+        dup_collapsed=0,
+        char_count=len(text),
+        body="\n".join(blocks),
+        head=head,
+        block_texts=blocks,
+    )
+
+
+def test_strip_chrome_removes_a_site_wide_block_and_keeps_page_specific_text() -> None:
+    """The CTA recurs on every page; each page's own answer recurs on one."""
+    cta = "ABB mobile yükləmək üçün QR kodu skan edin."
+    pages = [
+        (f"https://abb-bank.az/p{i}", _pg((f"Sual {i}?", f"Cavab {i}."), (cta,))) for i in range(40)
+    ]
+    out, removed = strip_chrome(pages)
+    assert removed == 40, "the CTA should be stripped from every page, once each"
+    for i, (_, p) in enumerate(out):
+        assert cta not in p.text
+        assert f"Sual {i}?" in p.text and f"Cavab {i}." in p.text
+        assert p.char_count == len(p.text)
+
+
+def test_strip_chrome_collapses_a_pure_chrome_shell_to_nothing() -> None:
+    """An empty shell is a generic title and description and no blocks. Once the
+    generic pair is recognised as chrome the shell has no content left at all --
+    which is what lets MIN_CHARS sit at 100 instead of straddling 190."""
+    generic = ("ABB - Müasir, Faydalı, Universal", "ABB bank sektoru üzrə regionun ən iri bankı.")
+    pages = [(f"https://abb-bank.az/shell{i}", _pg(generic, ())) for i in range(40)]
+    pages.append(("https://abb-bank.az/real", _pg(("Nağd kredit",), ("Şərtlər burada.",))))
+    out, _ = strip_chrome(pages)
+    by_url = dict(out)
+    assert by_url["https://abb-bank.az/shell0"].char_count == 0
+    assert by_url["https://abb-bank.az/real"].text == "Nağd kredit\nŞərtlər burada."
+
+
+def test_strip_chrome_does_nothing_in_a_corpus_too_small_to_judge() -> None:
+    """CHROME_MIN_DOCS is the floor: three pages sharing a line is not evidence
+    of site-wide chrome, and stripping it would delete real content."""
+    shared = "Eyni sətir"
+    pages = [(f"https://abb-bank.az/p{i}", _pg(("Başlıq",), (shared,))) for i in range(3)]
+    out, removed = strip_chrome(pages)
+    assert removed == 0
+    assert all(shared in p.text for _, p in out)
 
 
 def test_lowest_genuine_page_survives() -> None:

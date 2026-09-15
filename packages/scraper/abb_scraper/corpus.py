@@ -15,6 +15,7 @@ from abb_scraper.extract import (
     dedupe_blocks,
     extract_page,
     faq_blocks,
+    strip_chrome,
 )
 from abb_scraper.facts import extract_facts, reassemble
 from abb_scraper.fetcher import FetchResult
@@ -93,14 +94,14 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
             # its own meta description (measured 2026-09-15: 21 pairs, 0 in the
             # corpus). `[]` as the DOM blocks is deliberate: the body they would
             # have been deduped against is exactly what pointer mode throws away.
-            # `char_count` is deliberately NOT recomputed: the gate runs after
-            # this branch and must judge the full pre-truncation page, so a
-            # volatile page with no FAQ is still quality-gated as itself rather
-            # than dropped for being a short pointer.
-            faq = "\n".join(b.text for b in faq_blocks(res.html, [], path))
-            head = "\n".join(page.text.split("\n")[:2])
-            pointer = f"{head}\n{faq}" if faq else head
-            page = page._replace(text=pointer, body=faq)
+            faq = tuple(b.text for b in faq_blocks(res.html, [], path))
+            pointer = "\n".join(page.head + faq)
+            page = page._replace(
+                text=pointer,
+                body="\n".join(faq),
+                char_count=len(pointer),
+                block_texts=faq,
+            )
 
         if sc == "product":
             # Facts (Ruling P9): pull the real block list and dedupe it the same
@@ -124,6 +125,12 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
 
         pages.append((res.url, page))
         class_by_url[res.url] = sc
+
+    # Site-wide marketing rendered inside the content region, removed before the
+    # gate judges size: an empty shell is title+description chrome and nothing
+    # else, so stripping collapses it to 0 chars and it can no longer be
+    # confused with a short but real page.
+    pages, _chrome_removed = strip_chrome(pages)
 
     kept, gate_drops = apply_gates(pages)
     dropped.extend(gate_drops)
