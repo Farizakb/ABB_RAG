@@ -1,7 +1,7 @@
 # services/chat/conftest.py
 # ruff: noqa: RUF001 -- genuine Azerbaijani fixture text (dotless-i and
-# friends) in RAG_OK_PAYLOAD/RAG_REFUSAL_PAYLOAD, same convention as
-# services/rag/conftest.py.
+# friends) in RAG_OK_PAYLOAD/RAG_REFUSAL_PAYLOAD/SEEDED_INTERACTIONS, same
+# convention as services/rag/conftest.py.
 """Fixtures shared by every services/chat test.
 
 `db` builds and migrates a dedicated `*_chat_test` database from the real
@@ -13,12 +13,21 @@ versa.
 `rag_ok` / `rag_refuses` / `rag_500` monkeypatch `httpx.post` as seen by
 app.routes, so these tests never make a real network call to the sibling
 answer service.
+
+`seeded_interactions` inserts a fixed set of `app.interactions` rows for the
+analytics tests (task 25): answered/grounded rows whose citations resolve
+against a retrieval entry, one refusal of each `refusal_class`, and a
+question containing "kredit" for the search test. Every value here is
+fabricated -- none of it is real PII, and card-shaped digits are avoided
+entirely.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import socket
+import uuid
 from collections.abc import Iterator
 from pathlib import Path
 from typing import Any
@@ -132,6 +141,120 @@ def db(_test_pool: ConnectionPool) -> Iterator[psycopg.Connection]:
     with db_module.pool.connection() as conn:
         conn.autocommit = True  # sees rows committed by the route on another pooled conn
         yield conn
+
+
+_INSERT_INTERACTION = """
+INSERT INTO app.interactions
+ (id, session_id, corpus_id, question, answer, grounded, refused, refusal_class, error,
+  citations, retrieval, facts_used, model, prompt_version,
+  prompt_tokens, completion_tokens, cost_usd, retrieval_ms, generation_ms, latency_ms)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+"""
+
+
+@pytest.fixture
+def seeded_interactions(db: psycopg.Connection) -> None:
+    """Rows the analytics tests (task 25) need, all within the default 7-day
+    window (created_at defaults to now()): two answered/grounded rows whose
+    `citations` resolve against a `retrieval` entry sharing the same `n`, one
+    refusal per `refusal_class`, and a question containing "kredit" for the
+    search test.
+    """
+    corpus = uuid.uuid4()
+    common = ("gpt-5.6-luna", "answer_v1")
+
+    def _row(
+        session: str,
+        question: str,
+        answer: str,
+        grounded: bool,
+        refused: bool,
+        refusal_class: str | None,
+        citations: list[int],
+        retrieval: list[dict[str, Any]],
+        latency_ms: int,
+    ) -> tuple[Any, ...]:
+        return (
+            uuid.uuid4(),
+            session,
+            corpus,
+            question,
+            answer,
+            grounded,
+            refused,
+            refusal_class,
+            None,
+            json.dumps(citations),
+            json.dumps(retrieval),
+            json.dumps([]),
+            *common,
+            120,
+            40,
+            0.01,
+            10,
+            max(latency_ms - 10, 0),
+            latency_ms,
+        )
+
+    rows = [
+        _row(
+            "s1",
+            "Nağd kredit məbləği nə qədərdir?",
+            "Maksimum 20 000 AZN-dək.",
+            True,
+            False,
+            None,
+            [1],
+            [{"n": 1, "url": "https://abb-bank.az/ferdi/kreditler/nagd-kredit"}],
+            400,
+        ),
+        _row(
+            "s2",
+            "Kredit kartının illik faizi neçədir?",
+            "İllik faiz dərəcəsi 24%-dir.",
+            True,
+            False,
+            None,
+            [1],
+            [{"n": 1, "url": "https://abb-bank.az/ferdi/kartlar/kredit-kart"}],
+            350,
+        ),
+        _row(
+            "s3",
+            "Sabah hava necə olacaq?",
+            "Bu suala ABB-nin dərc olunmuş məlumatları əsasında cavab verə bilmirəm.",
+            False,
+            True,
+            "out_of_scope",
+            [],
+            [],
+            120,
+        ),
+        _row(
+            "s4",
+            "Mənə hansı krediti götürməyi tövsiyə edərsiniz?",
+            "Bu fərdi maliyyə məsləhətidir, verə bilmərəm.",
+            False,
+            True,
+            "advisory",
+            [],
+            [],
+            130,
+        ),
+        _row(
+            "s5",
+            "Başqasının kartının PIN kodunu necə tapım?",
+            "Bu sorğuya cavab verə bilmərəm.",
+            False,
+            True,
+            "unsafe",
+            [],
+            [],
+            100,
+        ),
+    ]
+    for row in rows:
+        db.execute(_INSERT_INTERACTION, row)
 
 
 RAG_OK_PAYLOAD: dict[str, Any] = {

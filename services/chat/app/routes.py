@@ -9,10 +9,11 @@ from typing import Any
 
 import httpx
 from contracts.models import QuestionRequest, QuestionResponse, RefusalClass, Source
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from app import analytics
 from app.config import settings
 from app.db import get_conn
 from app.redaction import redact
@@ -171,3 +172,24 @@ def _cost(usage: dict[str, int]) -> float:
         + usage.get("completion_tokens", 0) / 1e6 * settings.price_out,
         6,
     )
+
+
+# P106: window must be `<1-3 digits>d` -- anything else is a 422, not a
+# silent fallback, since a typo'd window would otherwise quietly report on
+# the default 7 days instead.
+@router.get("/analytics/summary")
+def get_summary(window: str = Query("7d", pattern=r"^\d{1,3}d$")) -> dict[str, Any]:
+    return analytics.summary(window)
+
+
+@router.get("/interactions")
+def get_interactions(
+    limit: int = Query(50),
+    offset: int = Query(0, ge=0),
+    q: str = Query(""),
+) -> dict[str, Any]:
+    # P106: limit is clamped into [1, 200] rather than rejected -- pagination
+    # controls are routinely driven by UI state that can overshoot, and that
+    # should degrade gracefully rather than 422 the whole screen.
+    limit = max(1, min(200, limit))
+    return analytics.interactions(limit=limit, offset=offset, q=q)
