@@ -273,6 +273,11 @@ MIN_CHARS = 100  # measured on CHROME-STRIPPED text over the full 550-page cache
 
 CHROME_MIN_DOCS = 20  # never strip anything in a corpus too small to judge
 CHROME_DOC_FRACTION = 0.15  # ...and only what recurs on 15%+ of the pages
+CHROME_MIN_CHARS = 25  # a piece this short cannot dilute an embedding; see below
+# Measured 2026-09-15 against the two live corpora: table labels (`Müddət` 6
+# chars, `Valyuta` 7, the "open an account" CTA 10, ...) top out at 13;
+# genuine chrome (CTAs, the generic shell title/description) bottoms out at
+# 32. 25 sits in the open space between 13 and 32.
 
 
 def _chrome_key(s: str) -> str:
@@ -291,16 +296,21 @@ def strip_chrome(pages: list[tuple[str, PageText]]) -> tuple[list[tuple[str, Pag
     question they answer, because their vector described the ABB mobile app
     rather than paying a utility bill.
 
-    Frequency is counted per PIECE, not per line. A line rule would strip
-    "Müddət" (76 pages) and orphan the "60 ayadək" beside it, since the label
-    repeats but the value does not. A whole block repeated verbatim is chrome;
-    a table whose values differ is not.
+    Frequency is counted per PIECE, not per line -- but on this site that does
+    NOT protect a table label: "Müddət" (the term-row label) IS its own block,
+    so per-piece granularity strips it exactly as a line rule would. What
+    actually protects it is CHROME_MIN_CHARS: a piece must also be at least
+    that many chars to be stripped, and a 6-13 char label cannot dominate an
+    embedding the way a 32+ char repeated passage can. A whole block repeated
+    verbatim is chrome only once it is also long enough to dilute.
 
-    The threshold is a fraction of the corpus with an absolute floor, so a
-    handful of fixture pages in a test never look like a site-wide pattern.
-    Measured at 15% of 548 pages (>=82), exactly six pieces qualify: the generic
-    title and description, "aktiv deyil", and the three CTA blocks. "Müddət" at
-    76 survives, and the largest product page loses only the 117-char CTA.
+    The frequency threshold is a fraction of the corpus with an absolute
+    floor, so a handful of fixture pages in a test never look like a
+    site-wide pattern. That fraction is unstable across corpus sizes, though:
+    `build_corpus` calls this on the ~290 pages left after per-page filtering,
+    not the 550-page raw cache, so the correct piece count depends on which
+    population you measure -- CHROME_MIN_CHARS is what actually separates
+    chrome from labels, not the frequency threshold's exact crossing point.
 
     Returns the rebuilt pages and the number of pieces removed.
     """
@@ -310,11 +320,17 @@ def strip_chrome(pages: list[tuple[str, PageText]]) -> tuple[list[tuple[str, Pag
         for k in {_chrome_key(x) for x in p.head + p.block_texts}:
             df[k] += 1
 
+    def _keep(x: str) -> bool:
+        # Strip only when BOTH over the document-frequency threshold and
+        # long enough to actually dilute an embedding (P88): a short piece
+        # (e.g. the "Müddət" table label) survives even at high frequency.
+        return df[_chrome_key(x)] < threshold or len(x) < CHROME_MIN_CHARS
+
     out: list[tuple[str, PageText]] = []
     removed = 0
     for url, p in pages:
-        head = tuple(x for x in p.head if df[_chrome_key(x)] < threshold)
-        blocks = tuple(x for x in p.block_texts if df[_chrome_key(x)] < threshold)
+        head = tuple(x for x in p.head if _keep(x))
+        blocks = tuple(x for x in p.block_texts if _keep(x))
         removed += (len(p.head) - len(head)) + (len(p.block_texts) - len(blocks))
         body = "\n".join(blocks)
         text = "\n".join(head + blocks)

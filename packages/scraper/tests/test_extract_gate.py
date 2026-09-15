@@ -4,6 +4,7 @@
 from pathlib import Path
 
 from abb_scraper.extract import (
+    CHROME_MIN_CHARS,
     MIN_CHARS,
     PageText,
     apply_gates,
@@ -116,6 +117,33 @@ def test_strip_chrome_collapses_a_pure_chrome_shell_to_nothing() -> None:
     by_url = dict(out)
     assert by_url["https://abb-bank.az/shell0"].char_count == 0
     assert by_url["https://abb-bank.az/real"].text == "Nağd kredit\nŞərtlər burada."
+
+
+def test_strip_chrome_keeps_short_high_frequency_table_labels_a05_a31_regression() -> None:
+    """The a05/a31 regression: `Müddət` (6 chars) is the term-row label on
+    every product table and recurs on far more than 15% of pages, so the
+    frequency gate alone used to strip it and orphan the value beside it --
+    measured damage on evals/golden.jsonl: a05 "What is the maximum term for
+    a cash loan?" fell from rank 6 to rank 14, and a31 "kredit max nece aya
+    olur" dropped out of the top 20 entirely. A 6-char label cannot dominate
+    an embedding, so CHROME_MIN_CHARS protects it even though it clears the
+    document-frequency threshold."""
+    pages = [
+        (f"https://abb-bank.az/p{i}", _pg((f"Sual {i}?",), ("Müddət", f"{i} ayadək")))
+        for i in range(40)
+    ]
+    out, _ = strip_chrome(pages)
+    for _, p in out:
+        assert "Müddət" in p.text
+
+
+def test_chrome_min_chars_sits_in_the_measured_gap_between_labels_and_chrome() -> None:
+    """Measured 2026-09-15: table labels run 6, 7, 10, 10, 11, 12, 13 chars
+    (the longest is the "open an account" CTA and two others up to 13);
+    genuine chrome runs 32, 34, 43, 62, 72, 157 chars (shortest is the
+    generic shell title at 32). 25 sits in the open space between 13 and 32,
+    same style as test_gate_sits_in_the_measured_gap_between_shells_and_real_pages."""
+    assert CHROME_MIN_CHARS == 25
 
 
 def test_strip_chrome_does_nothing_in_a_corpus_too_small_to_judge() -> None:
