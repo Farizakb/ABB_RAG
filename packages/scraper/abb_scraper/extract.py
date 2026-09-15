@@ -250,9 +250,22 @@ def page_meta(html: str) -> tuple[str, str]:
     return title, meta
 
 
-MIN_CHARS = 400  # measured corpus-wide (243 kept documents, full crawl 2026-09-13):
-# empty-shell baseline 190 (stub-empty), lowest genuine kept document 410
-# (haqqimizda/rekvizitler) -- a 10-character margin.
+MIN_CHARS = 250  # re-measured corpus-wide over the full 550-page raw cache
+# (2026-09-15), replacing the 400 calibrated on the day-three 243-document crawl.
+# 400 was separating the wrong two populations. The gate counts `char_count` =
+# len(title + meta + body), and ABB's "root stub" pages (SPEC §5.3 rule 3) carry
+# their whole substance in title+meta -- the question in the title, the answer in
+# the description -- above a 117-character boilerplate body that is the same ABB
+# mobile CTA on all 18 of them. At 400 every one of those was dropped:
+# /kredit-borcumu-nece-onlayn-odeye-bilerem, /kommunal-odenisleri-onlayn-nece-etmek-olar,
+# /ipoteka-odenisimi-nece-ede-bilerem and 15 siblings -- 18 of the highest-intent
+# customer questions in the corpus.
+# The two populations actually separate cleanly on char_count:
+#   empty shells (zero content blocks):      190 .. 206   (18 pages)
+#   genuine short pages:                     285 .. 389   (28 pages)
+# 250 sits in the gap with a 44-char margin above the largest shell and a 35-char
+# margin below the smallest genuine page. Ruling P57's constraint -- never let the
+# gate rise past a real page -- is preserved and tightened, not relaxed.
 
 
 class DropRecord(NamedTuple):
@@ -266,21 +279,39 @@ def apply_gates(
 ) -> tuple[list[tuple[str, PageText]], list[DropRecord]]:
     """SPEC §5.3 rules 4 and 5.
 
-    Rule 4 hashes the *body* only. Hashing title+description too would silently
-    delete every page sharing the generic site title.
+    Rule 4 identifies a page by whichever half actually carries its substance.
+
+    Hashing title+description would silently delete every page sharing the
+    generic site title, so the body is the right key for an ordinary page. But
+    the body is the WRONG key for a root stub (rule 3), whose content is the
+    question in its title and the answer in its description, above a boilerplate
+    body. ABB serves the identical 117-character "ABB mobile" CTA as the body of
+    18 such stubs -- /kredit-borcumu-nece-onlayn-odeye-bilerem,
+    /ipoteka-odenisimi-nece-ede-bilerem and 16 siblings. Keying those on the body
+    collapsed all 18 into whichever one happened to be crawled first and silently
+    deleted the other 17, each a distinct high-intent customer question
+    (measured 2026-09-15 over the full 550-page raw cache).
+
+    So: key on the body when the body outweighs title+meta, otherwise key on the
+    full text. `head` is derived by subtraction rather than re-parsing, because
+    `text` is exactly title+meta+body joined by extract_page. An ordinary page
+    keeps body-keying and the cross-document-duplicate count is unchanged at 31;
+    a root stub is keyed on the text that distinguishes it. Two genuinely
+    identical pages still collapse under either branch.
     """
     kept: list[tuple[str, PageText]] = []
     dropped: list[DropRecord] = []
     seen_bodies: set[str] = set()
 
     for url, page in pages:
-        body = page.body
-        key = hashlib.sha256(re.sub(r"\s+", " ", body.lower()).encode()).hexdigest()
-        if body and key in seen_bodies:
+        head = len(page.text) - len(page.body)
+        ident = page.body if len(page.body) > head else page.text
+        key = hashlib.sha256(re.sub(r"\s+", " ", ident.lower()).encode()).hexdigest()
+        if ident.strip() and key in seen_bodies:
             dropped.append(DropRecord(url, "cross-document-duplicate", page.char_count))
             continue
         if page.char_count < MIN_CHARS:
-            dropped.append(DropRecord(url, "under-400-chars", page.char_count))
+            dropped.append(DropRecord(url, "under-min-chars", page.char_count))
             continue
         seen_bodies.add(key)
         kept.append((url, page))

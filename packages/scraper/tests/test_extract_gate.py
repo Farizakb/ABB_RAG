@@ -24,26 +24,54 @@ def page(text: str, body: str | None = None) -> PageText:
     )
 
 
-def test_gate_is_400_not_150() -> None:
-    """SPEC §5.3 rule 5. The measured empty shell is 190 chars, so any gate at or
-    below it passes every empty page — which is why v1.0's 150 was inoperative."""
-    assert MIN_CHARS == 400
-    assert MIN_CHARS > 190  # must exceed the empty-shell baseline (stub-empty) to drop it
-    # Must not exceed the lowest genuine kept document, measured corpus-wide (243
-    # kept documents, full 551-page crawl 2026-09-13) -- not just the 11 committed
-    # fixtures' 439 (biznes-sub-korporativ), which is a strictly smaller sample and
-    # would let MIN_CHARS silently rise past a real page (Ruling P57). The lowest
-    # genuine kept document is https://abb-bank.az/haqqimizda/rekvizitler at 410
-    # chars. /ferdi/valyuta-mezenneleri (202 chars) is NOT a counterexample: it is
-    # the single `volatile` page in SPEC §5.4 pointer mode, whose body is
-    # deliberately discarded by corpus.py after char_count was computed.
-    assert MIN_CHARS <= 410
+def test_gate_sits_in_the_measured_gap_between_shells_and_real_pages() -> None:
+    """SPEC §5.3 rule 5, re-measured over the full 550-page raw cache 2026-09-15.
+
+    Two populations, and the gate must fall between them:
+        empty shells (zero content blocks)  190 .. 206   (18 pages)
+        genuine short pages                 285 .. 389   (28 pages)
+
+    The previous 400 was above the TOP of the genuine population, not between
+    them, so it dropped all 28 -- including the 18 root stubs whose whole
+    substance is a customer question in the title and its answer in the meta
+    description. Ruling P57's constraint (never rise past a real page) is what
+    these bounds encode; 400 violated it against the full cache even though it
+    held against the smaller day-three sample it was calibrated on.
+    """
+    assert MIN_CHARS == 250
+    assert MIN_CHARS > 206  # above every measured empty shell, so all 18 still drop
+    assert MIN_CHARS <= 285  # at or below the smallest genuine page, so none is lost
 
 
 def test_empty_shell_at_the_measured_baseline_is_dropped() -> None:
-    kept, dropped = apply_gates([("https://abb-bank.az/empty", page("x" * 273))])
+    kept, dropped = apply_gates([("https://abb-bank.az/empty", page("x" * 206))])
     assert kept == []
-    assert dropped[0].reason == "under-400-chars" and dropped[0].char_count == 273
+    assert dropped[0].reason == "under-min-chars" and dropped[0].char_count == 206
+
+
+def test_smallest_genuine_page_in_the_measured_population_survives() -> None:
+    """The counterpart to the shell test: 285 chars is the smallest real page in
+    the full-cache measurement and must clear the gate."""
+    kept, _ = apply_gates([("https://abb-bank.az/real", page("x" * 285))])
+    assert len(kept) == 1
+
+
+def test_root_stubs_sharing_a_boilerplate_body_are_not_deduped_into_one() -> None:
+    """The regression the 2026-09-15 re-measurement exposed. ABB serves the same
+    117-char "ABB mobile" CTA as the body of 18 root stubs whose real content is
+    their title+meta. Keying identity on the body collapsed all 18 into the first
+    and silently deleted 17 distinct customer questions, so identity keys on the
+    full text whenever the body does not outweigh title+meta."""
+    boiler = "c" * 117
+    a = page("Kredit borcumu necə onlayn ödəyə bilərəm? " + "a" * 200 + "\n" + boiler, body=boiler)
+    b = page(
+        "Kommunal ödənişləri onlayn necə etmək olar? " + "b" * 200 + "\n" + boiler, body=boiler
+    )
+    kept, dropped = apply_gates(
+        [("https://abb-bank.az/kredit", a), ("https://abb-bank.az/komm", b)]
+    )
+    assert [u for u, _ in kept] == ["https://abb-bank.az/kredit", "https://abb-bank.az/komm"]
+    assert dropped == []
 
 
 def test_lowest_genuine_page_survives() -> None:
@@ -64,7 +92,7 @@ def test_two_bodyless_pages_are_not_deduped_against_each_other() -> None:
     """Ruling P41's crux: `apply_gates`'s `if body and key in seen_bodies:`
     guard exists precisely so an empty body never collides via hash("").
     Two unrelated bodyless root stubs (SPEC §5.3 rule 3) -- title+meta alone
-    clearing the 400-char gate, zero content blocks -- must both survive;
+    clearing the gate, zero content blocks -- must both survive;
     neither may be dropped as a cross-document-duplicate of the other."""
     kept, dropped = apply_gates(
         [

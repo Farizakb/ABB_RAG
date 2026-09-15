@@ -154,9 +154,11 @@ def index_documents(docs: list[Document]) -> list[Document]:
       shell -- `extract_page` recovers only 320 chars ("Kampaniyalar", "Ən
       son kampaniyalar", plus generic ABB-mobile-app boilerplate), under the
       §5.3 400-char gate, and zero same-prefix child links exist anywhere in
-      its raw HTML. So the campaign index is built both because ABB's real
-      hub doesn't enumerate its children (0.00 < 0.60) and because the page
-      itself would be dropped by the §5.3 gate regardless.
+      its raw HTML. So the campaign index is built because ABB's real hub
+      doesn't enumerate its children (0.00 < 0.60). (That shell was also
+      under the §5.3 gate when it was 400; at the re-measured 250 it now
+      clears the gate, so `build_corpus` drops the shell in favour of this
+      index rather than emitting two documents under one URL.)
       `_abb_already_enumerates` is still called on every ingest (not skipped
       just because this one-off probe found a shell): if ABB ever ships a
       working `/ferdi/kampaniyalar` that server-renders its campaign list, a

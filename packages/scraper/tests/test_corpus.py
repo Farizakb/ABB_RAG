@@ -1,6 +1,7 @@
 # packages/scraper/tests/test_corpus.py
 # ruff: noqa: RUF001 -- genuine Azerbaijani text, not ambiguous-
 # character typos; see campaigns.py / facts.py for the same convention.
+import json
 from datetime import date
 
 from abb_scraper.corpus import build_corpus
@@ -189,11 +190,11 @@ def test_cross_block_duplicate_facts_collapse_to_one_row() -> None:
 # ------------------------------------------------------------------- gate wiring
 
 
-def test_under_400_char_pages_are_dropped_via_build_corpus() -> None:
+def test_under_min_char_pages_are_dropped_via_build_corpus() -> None:
     results = [r("/empty", page("Boş", body_chars=10))]
     corpus, dropped = build_corpus(results, TODAY)
     assert corpus.documents == []
-    assert dropped[0].reason == "under-400-chars"
+    assert dropped[0].reason == "under-min-chars"
 
 
 def test_cross_document_duplicate_bodies_are_dropped_via_build_corpus() -> None:
@@ -225,3 +226,55 @@ def test_volatile_page_is_stored_as_a_pointer_not_full_body() -> None:
     doc = corpus.documents[0]
     assert doc.source_class == "volatile"
     assert "x" * 900 not in doc.text
+
+
+def test_no_two_documents_ever_share_a_url() -> None:
+    """The synthetic campaign index is published at /ferdi/kampaniyalar, the URL
+    of the real hub page. That hub is a 320-char client-rendered shell: under the
+    old 400 gate it was dropped and the two never met, but at the re-measured 250
+    it clears the gate, so both would be emitted under one URL. Retrieval keys
+    chunk text by URL, so the duplicate would silently shadow one of them."""
+    results = [
+        r("/kampaniyalar/aktiv", page("Aktiv").replace("</p>", "01.09.2026 - 31.12.2026</p>")),
+        r("/ferdi/kampaniyalar", page("Kampaniyalar", body_chars=260)),
+    ]
+    corpus, _ = build_corpus(results, TODAY)
+    urls = [d.url for d in corpus.documents]
+    assert len(urls) == len(set(urls)), f"duplicate url in corpus: {urls}"
+
+    hub = [d for d in corpus.documents if d.url.endswith("/ferdi/kampaniyalar")]
+    assert len(hub) == 1 and hub[0].source_class == "index", "the enumerating index must win"
+    assert "aktiv" in hub[0].text.lower()
+
+
+def _flight_faq(slug: str, question: str, answer: str) -> str:
+    """One accordion item in the Next.js flight stream, the way ABB emits it:
+    a `self.__next_f.push` row carrying a `\\u003c`-escaped React Query record."""
+    obj = json.dumps({"trigger": question, "content": f"<p>{answer}</p>"}, separators=(",", ":"))
+    row = (
+        f'"state":{{"data":{{"data":[{{"id":1,"slug":"{slug}","url":"ferdi/{slug}"'
+        f',"sections":[{obj.replace("<", chr(92) + "u003c")}]}}]}}}}'
+    )
+    return f"<script>self.__next_f.push([1,{json.dumps(row)}])</script>"
+
+
+def test_volatile_pointer_keeps_its_faq_while_discarding_the_rate_body() -> None:
+    """The rate table goes stale and is discarded (SPEC §5.4); the FAQ does not.
+
+    /ferdi/valyuta-mezenneleri carries 21 Q&A pairs that answer things
+    independent of the rate — whether there is a commission, how to read the
+    live rate. Pointer mode was discarding all 21 with the table, leaving the
+    page's only retrievable text its own meta description (measured 2026-09-15:
+    21 pairs on the page, 0 reaching the corpus).
+    """
+    question = "Valyuta köçürməsinə komissiya tutulurmu?"
+    answer = "Xeyr, ABB mobile vasitəsilə edilən ilk köçürmə komissiyasızdır."
+    html = page("Valyuta məzənnələri", body_chars=900).replace(
+        "</body>", _flight_faq("valyuta-mezenneleri", question, answer) + "</body>"
+    )
+    corpus, _ = build_corpus([r("/ferdi/valyuta-mezenneleri", html)], TODAY)
+
+    doc = corpus.documents[0]
+    assert doc.source_class == "volatile"
+    assert "x" * 900 not in doc.text, "the rate body must still be discarded"
+    assert question in doc.text and answer in doc.text, "the FAQ must survive pointer mode"

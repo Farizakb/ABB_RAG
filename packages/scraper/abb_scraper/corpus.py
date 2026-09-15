@@ -14,6 +14,7 @@ from abb_scraper.extract import (
     content_blocks,
     dedupe_blocks,
     extract_page,
+    faq_blocks,
 )
 from abb_scraper.facts import extract_facts, reassemble
 from abb_scraper.fetcher import FetchResult
@@ -81,8 +82,25 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
         page = extract_page(res.html, res.url)
 
         if sc == "volatile":
-            # Pointer mode: title and description only, body discarded (SPEC §5.4).
-            page = page._replace(text="\n".join(page.text.split("\n")[:2]))
+            # Pointer mode: title and description only, rate body discarded
+            # (SPEC §5.4) -- a rate table is stale the moment it is embedded.
+            #
+            # The FAQ is not a rate table and is kept. /ferdi/valyuta-mezenneleri
+            # carries 21 Q&A pairs answering things that do not move with the
+            # rate -- whether there is a commission, how to see the live rate,
+            # which currencies are traded -- and pointer mode was discarding all
+            # 21 along with the table, leaving the page's only retrievable text
+            # its own meta description (measured 2026-09-15: 21 pairs, 0 in the
+            # corpus). `[]` as the DOM blocks is deliberate: the body they would
+            # have been deduped against is exactly what pointer mode throws away.
+            # `char_count` is deliberately NOT recomputed: the gate runs after
+            # this branch and must judge the full pre-truncation page, so a
+            # volatile page with no FAQ is still quality-gated as itself rather
+            # than dropped for being a short pointer.
+            faq = "\n".join(b.text for b in faq_blocks(res.html, [], path))
+            head = "\n".join(page.text.split("\n")[:2])
+            pointer = f"{head}\n{faq}" if faq else head
+            page = page._replace(text=pointer, body=faq)
 
         if sc == "product":
             # Facts (Ruling P9): pull the real block list and dedupe it the same
@@ -146,7 +164,17 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
     # enumerates its products (1.00 >= 0.60, no product index), /ferdi/kampaniyalar
     # does not (0.00 < 0.60, campaign index built). Only the campaign branch of
     # index_documents exists; this call is unconditional per that measured verdict.
-    docs.extend(index_documents(docs))
+    # A synthetic index is published at the URL of the real hub page it
+    # enumerates. That hub (/ferdi/kampaniyalar, a 320-char client-rendered
+    # shell) used to be dropped by the §5.3 gate, so the two never collided --
+    # but MIN_CHARS is now 250 and the shell clears it, which would emit two
+    # documents under one URL. Retrieval keys chunk text by URL
+    # (retrieval.source_texts), so a duplicate silently shadows one of them.
+    # The index wins: it carries the enumeration the shell lacks, and the
+    # shell's own text is just the heading the index already restates.
+    indexes = index_documents(docs)
+    shadowed = {d.url for d in indexes}
+    docs = [d for d in docs if d.url not in shadowed] + indexes
 
     corpus = Corpus(
         scraped_at=datetime.now(UTC),
