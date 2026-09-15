@@ -40,6 +40,23 @@ def test_a_malformed_200_still_writes_exactly_one_row(db: Any, rag_malformed: No
     assert row[0] is True and row[1]
 
 
+def test_a_200_missing_required_keys_still_writes_exactly_one_row(
+    db: Any, rag_missing_key: None
+) -> None:
+    """A syntactically valid JSON 200 body missing answer/grounded/refused/
+    sources must not skip the insert either -- distinct from the non-JSON
+    case above: json.loads succeeds here, so this proves the explicit shape
+    check (not just the JSONDecodeError catch) routes into the same
+    error-persist branch. Covers the missing-`sources` gap from code review
+    too, since `sources` is validated by the same key set as the other
+    three."""
+    r = client.post("/api/v1/questions", json={"corpus_id": "c1", "question": "x"})
+    assert r.status_code == 502
+    assert db.execute("SELECT count(*) FROM app.interactions").fetchone()[0] == 1
+    row = db.execute("SELECT refused, error FROM app.interactions").fetchone()
+    assert row[0] is True and row[1]
+
+
 def test_the_persisted_question_is_redacted(db: Any, rag_ok: None) -> None:
     client.post(
         "/api/v1/questions",

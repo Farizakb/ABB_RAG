@@ -214,3 +214,15 @@ def rag_malformed(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.routes.httpx.post", _fake_post_raw(200, b"<html>502 Bad Gateway</html>")
     )
+
+
+@pytest.fixture
+def rag_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HTTP 200 with a syntactically valid JSON body that is missing every
+    required key (answer/grounded/refused/sources). Distinct code path from
+    `rag_malformed`: json.loads succeeds here, so this exercises the explicit
+    shape check in ask() (the `raise ValueError("malformed answer payload")`
+    branch) rather than json.JSONDecodeError -- both must land in the same
+    error-persist branch, but only this fixture proves the shape check
+    itself is wired up."""
+    monkeypatch.setattr("app.routes.httpx.post", _fake_post({"foo": "bar"}, 200))

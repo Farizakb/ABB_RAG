@@ -64,8 +64,11 @@ def ask(request: Request, req: QuestionRequest) -> QuestionResponse:
         # branch below, not escape as an uncaught exception that skips
         # _persist entirely (Invariant 4: exactly one row per call, including
         # errors). Validated here, inside the guarded region, rather than at
-        # the data["answer"]/["grounded"]/["refused"] access sites below.
-        if not isinstance(data, dict) or not {"answer", "grounded", "refused"} <= data.keys():
+        # the bare data[...] access sites below -- every key read via a bare
+        # subscript further down (never a data.get(...), those already
+        # tolerate absence) must appear in this set.
+        _required_keys = {"answer", "grounded", "refused", "sources"}
+        if not isinstance(data, dict) or not _required_keys <= data.keys():
             raise ValueError("malformed answer payload")
         err = None
     except (httpx.HTTPError, ValueError, KeyError) as exc:
