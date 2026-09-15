@@ -29,7 +29,14 @@ def test_sources_are_numbered_from_one_in_retrieval_order(seeded_corpus: str, db
     result = retrieve(seeded_corpus, "kredit", FakeEmbedder(dim=8))
     assert result.sources  # P81: [] == [] would pass this ordering check vacuously
     assert [s.n for s in result.sources] == list(range(1, len(result.sources) + 1))
-    assert result.sources == sorted(result.sources, key=lambda s: -s.score)
+    # NOT `result.sources == sorted(result.sources, key=lambda s: -s.score)` any
+    # more. Under hybrid retrieval `Source.score` is only the dense cosine
+    # component -- what `retrieval_floor` gates on and what analytics compares
+    # across queries -- while display order is the fused RRF rank. The two
+    # coincided under dense-only retrieval by construction; under fusion they
+    # deliberately do not, because a document the lexical legs single out must
+    # be able to outrank a dense-only near-duplicate. See
+    # test_a_lexically_favoured_document_can_outrank_a_higher_dense_score below.
 
 
 def test_governed_facts_travel_with_their_source(seeded_corpus: str, db: Any) -> None:
@@ -244,6 +251,49 @@ def test_a_lexical_only_match_can_reach_the_prompt(
 
     assert len(result.sources) == 1
     assert result.sources[0].url == "https://abb-bank.az/test/lexical-match"
+
+
+def test_a_lexically_favoured_document_can_outrank_a_higher_dense_score(
+    db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fix round 1: the property the old re-sort-by-score destroyed. FakeEmbedder
+    gives the car-insurance document a higher raw dense score (0.60) than the
+    telephone-banking one (0.33) for the query "telefon" -- verified directly
+    against FakeEmbedder(dim=8). Despite that, the telephone-banking document
+    is the only one either lexical leg singles out, so fused rank must put it
+    first: sources ship in fused order, not re-sorted by the dense component,
+    which is exactly what lets a lexically-favoured document with a *lower*
+    dense score outrank a dense-only near-duplicate with a higher one."""
+    docs = [
+        Document(
+            url="https://abb-bank.az/test/lexical-match",
+            title="Telefon bankçılığı",
+            section_path=["Test"],
+            source_class="product",
+            text="Telefon bankçılığı xidməti mövcuddur.",
+            content_hash="sha256:seed-lexical-match-2",
+        ),
+        Document(
+            url="https://abb-bank.az/test/lexical-miss",
+            title="Avtomobil sığortası",
+            section_path=["Test"],
+            source_class="product",
+            text="Avtomobil sığortası təklif olunur.",
+            content_hash="sha256:seed-lexical-miss-2",
+        ),
+    ]
+    corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
+    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+
+    result = retrieve(corpus_id, "telefon", FakeEmbedder(dim=8), k_candidates=10, k_prompt=2)
+
+    assert [s.url for s in result.sources] == [
+        "https://abb-bank.az/test/lexical-match",
+        "https://abb-bank.az/test/lexical-miss",
+    ]
+    # The property under test, stated directly: fused rank 1 has the LOWER
+    # dense score. A re-sort by -score would put these in the opposite order.
+    assert result.sources[0].score < result.sources[1].score
 
 
 def test_a_query_of_only_stopwords_matches_nothing_lexically() -> None:

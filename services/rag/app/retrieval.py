@@ -226,14 +226,15 @@ def retrieve(
             else []
         )
         by_doc = {r[6]: r for r in chunk_rows}
-        # Fused order decided *which* documents make the cut; for the citation
-        # numbering shown to the user, order the winners by their (comparable,
-        # bounded) dense score -- RRF's rank-sum has no meaning outside fusion
-        # itself and would make source 1 sometimes score lower than source 3.
-        above = sorted(
-            (by_doc[doc_id] for doc_id in above_ids if doc_id in by_doc),
-            key=lambda r: -r[7],
-        )
+        # Rows are kept in `above_ids`' fused order, not re-sorted by dense
+        # score -- fusion exists precisely to promote a document the lexical
+        # legs single out ahead of a dense-only near-duplicate, and the prompt
+        # presents sources as [1]..[5] with the model weighting earlier ones,
+        # so re-sorting here would partially undo that. `Source.score` below
+        # is the dense cosine component (what `retrieval_floor` gates on and
+        # what analytics compares across queries) -- it is deliberately NOT
+        # the display sort key.
+        above = [by_doc[doc_id] for doc_id in above_ids if doc_id in by_doc]
 
         doc_ids = [r[6] for r in above]
         facts_by_doc: dict[object, list[Fact]] = {}
@@ -258,6 +259,9 @@ def retrieve(
             section_path=list(r[4] or []),
             url=r[5],
             listing_url=listing_url_for(r[5], known_urls),
+            # The dense cosine component, not the display sort key: `n` order
+            # is the fused rank (see `above`), so `score` can decrease then
+            # increase across sources -- that is fusion working as intended.
             score=round(float(r[7]), 4),
             source_class=r[2],
             facts=facts_by_doc.get(r[6], []),
