@@ -59,8 +59,18 @@ def ask(request: Request, req: QuestionRequest) -> QuestionResponse:
         )
         resp.raise_for_status()
         data = resp.json()
+        # A 200 with a malformed body (proxy error page, truncated response,
+        # wrong content-type) must land in the `data is None` error-persist
+        # branch below, not escape as an uncaught exception that skips
+        # _persist entirely (Invariant 4: exactly one row per call, including
+        # errors). Validated here, inside the guarded region, rather than at
+        # the data["answer"]/["grounded"]/["refused"] access sites below.
+        if not isinstance(data, dict) or not {"answer", "grounded", "refused"} <= data.keys():
+            raise ValueError("malformed answer payload")
         err = None
-    except httpx.HTTPError as exc:
+    except (httpx.HTTPError, ValueError, KeyError) as exc:
+        # json.JSONDecodeError subclasses ValueError (a non-JSON 200 body);
+        # KeyError is defensive in case resp.json() itself raises one.
         data, err = None, str(exc)[:500]
 
     latency = int((time.perf_counter() - started) * 1000)

@@ -182,6 +182,14 @@ def _fake_post(payload: dict[str, Any] | None, status: int) -> Any:
     return _post
 
 
+def _fake_post_raw(status: int, content: bytes) -> Any:
+    def _post(url: str, **_kwargs: Any) -> httpx.Response:
+        request = httpx.Request("POST", url)
+        return httpx.Response(status, content=content, request=request)
+
+    return _post
+
+
 @pytest.fixture
 def rag_ok(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.routes.httpx.post", _fake_post(RAG_OK_PAYLOAD, 200))
@@ -195,3 +203,14 @@ def rag_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def rag_500(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("app.routes.httpx.post", _fake_post(None, 500))
+
+
+@pytest.fixture
+def rag_malformed(monkeypatch: pytest.MonkeyPatch) -> None:
+    """HTTP 200 with a body that is not valid JSON -- a proxy error page, a
+    truncated response, a wrong content-type. Distinct from `rag_500`, which
+    covers a clean error status the code already handled; this covers the
+    json.JSONDecodeError hole flagged in code review."""
+    monkeypatch.setattr(
+        "app.routes.httpx.post", _fake_post_raw(200, b"<html>502 Bad Gateway</html>")
+    )

@@ -28,6 +28,18 @@ def test_a_rag_error_still_writes_exactly_one_row(db: Any, rag_500: None) -> Non
     assert row[0] is True and row[1]
 
 
+def test_a_malformed_200_still_writes_exactly_one_row(db: Any, rag_malformed: None) -> None:
+    """A proxy error page, a truncated body, or a wrong content-type on an
+    HTTP 200 must not skip the insert -- json.JSONDecodeError is not an
+    httpx.HTTPError subclass, so this is a distinct failure mode from
+    test_a_rag_error_still_writes_exactly_one_row's clean 500."""
+    r = client.post("/api/v1/questions", json={"corpus_id": "c1", "question": "x"})
+    assert r.status_code == 502
+    assert db.execute("SELECT count(*) FROM app.interactions").fetchone()[0] == 1
+    row = db.execute("SELECT refused, error FROM app.interactions").fetchone()
+    assert row[0] is True and row[1]
+
+
 def test_the_persisted_question_is_redacted(db: Any, rag_ok: None) -> None:
     client.post(
         "/api/v1/questions",
