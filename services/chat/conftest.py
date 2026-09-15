@@ -1,0 +1,197 @@
+# services/chat/conftest.py
+# ruff: noqa: RUF001 -- genuine Azerbaijani fixture text (dotless-i and
+# friends) in RAG_OK_PAYLOAD/RAG_REFUSAL_PAYLOAD, same convention as
+# services/rag/conftest.py.
+"""Fixtures shared by every services/chat test.
+
+`db` builds and migrates a dedicated `*_chat_test` database from the real
+migration file, the same approach services/rag/conftest.py uses for its own
+`*_test` database (P68) -- a different suffix so a concurrent `pytest
+services/rag` run never truncates tables this suite depends on, and vice
+versa.
+
+`rag_ok` / `rag_refuses` / `rag_500` monkeypatch `httpx.post` as seen by
+app.routes, so these tests never make a real network call to the sibling
+answer service.
+"""
+
+from __future__ import annotations
+
+import os
+import socket
+from collections.abc import Iterator
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+
+import app.db as db_module
+import httpx
+import psycopg
+import pytest
+from app.config import settings
+from psycopg_pool import ConnectionPool
+
+MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "migrations" / "001_schema.sql"
+TEST_DIM = 8
+
+
+def _reachable(url: str) -> str:
+    """Rewrite an unreachable host to `127.0.0.1` -- see the long version of
+    this rationale in services/rag/conftest.py (P68/P70): `settings.database_url`
+    defaults to the compose service name `db`, which only resolves inside the
+    compose network, and `localhost` pays a slow IPv6 fallback on Windows that
+    `ConnectionPool`'s background workers don't survive.
+    """
+    parts = urlsplit(url)
+    host = parts.hostname
+    if not host:
+        return url
+    port = parts.port or 5432
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            pass
+    except OSError:
+        return urlunsplit(
+            (
+                parts.scheme,
+                parts.netloc.replace(host, "127.0.0.1", 1),
+                parts.path,
+                parts.query,
+                parts.fragment,
+            )
+        )
+    return url
+
+
+def _test_database_url() -> str:
+    env_url = os.environ.get("TEST_DATABASE_URL")
+    if env_url:
+        return env_url
+    parts = urlsplit(settings.database_url)
+    dbname = parts.path.lstrip("/")
+    return _reachable(
+        urlunsplit(
+            (parts.scheme, parts.netloc, f"/{dbname}_chat_test", parts.query, parts.fragment)
+        )
+    )
+
+
+def _maintenance_url(test_url: str) -> str:
+    parts = urlsplit(test_url)
+    return urlunsplit((parts.scheme, parts.netloc, "/postgres", parts.query, parts.fragment))
+
+
+def _database_name(test_url: str) -> str:
+    return urlsplit(test_url).path.lstrip("/")
+
+
+@pytest.fixture(scope="session")
+def _test_pool() -> Iterator[ConnectionPool]:
+    test_url = _test_database_url()
+
+    try:
+        with psycopg.connect(
+            _maintenance_url(test_url), autocommit=True, connect_timeout=3
+        ) as conn:
+            dbname = _database_name(test_url)
+            exists = conn.execute(
+                "SELECT 1 FROM pg_database WHERE datname = %s", (dbname,)
+            ).fetchone()
+            if not exists:
+                conn.execute(f'CREATE DATABASE "{dbname}"')
+    except psycopg.OperationalError as exc:
+        # P69: unreachable SKIPS locally (no Postgres on the dev machine is a
+        # normal state) but FAILS when $CI is set (Postgres is guaranteed
+        # there -- a silent skip in CI is exactly how vacuous coverage hides).
+        reason = f"cannot reach test database at {test_url}: {exc}"
+        if os.environ.get("CI"):
+            pytest.fail(reason)
+        pytest.skip(reason)
+
+    with psycopg.connect(test_url, autocommit=True) as conn:
+        conn.execute("DROP SCHEMA IF EXISTS rag CASCADE")
+        conn.execute("DROP SCHEMA IF EXISTS app CASCADE")
+        sql = MIGRATION_PATH.read_text(encoding="utf-8").replace(":dim", str(TEST_DIM))
+        conn.execute(sql)
+
+    pool = ConnectionPool(test_url, min_size=1, max_size=4, open=True)
+    # app.db.get_conn() reads the module global `pool` at call time, so
+    # rebinding it here redirects every `get_conn()` call at the test
+    # database for the rest of the session.
+    db_module.pool = pool
+    yield pool
+    pool.close()
+
+
+@pytest.fixture
+def db(_test_pool: ConnectionPool) -> Iterator[psycopg.Connection]:
+    with db_module.get_conn() as conn:
+        conn.execute("TRUNCATE app.interactions")
+        conn.commit()
+
+    with db_module.pool.connection() as conn:
+        conn.autocommit = True  # sees rows committed by the route on another pooled conn
+        yield conn
+
+
+RAG_OK_PAYLOAD: dict[str, Any] = {
+    "answer": "Nağd kredit məbləği maksimum 20 000 AZN-dək təşkil edir.",
+    "citations": [1],
+    "sources": [
+        {
+            "n": 1,
+            "title": "Nağd kredit",
+            "section_path": ["Fərdi", "Kreditlər"],
+            "url": "https://abb-bank.az/ferdi/kreditler/nagd-kredit",
+            "listing_url": "https://abb-bank.az/ferdi/kreditler",
+            "score": 0.91,
+            "source_class": "product",
+            "facts": [],
+        }
+    ],
+    "facts_used": [],
+    "grounded": True,
+    "refused": False,
+    "refusal_class": None,
+    "usage": {"prompt_tokens": 120, "completion_tokens": 40},
+    "retrieval": [],
+    "timings_ms": {"retrieval_ms": 12, "generation_ms": 340},
+    "prompt_version": "answer_v1",
+}
+
+RAG_REFUSAL_PAYLOAD: dict[str, Any] = {
+    "answer": "Bu suala ABB-nin dərc olunmuş məlumatları əsasında cavab verə bilmirəm.",
+    "citations": [],
+    "sources": [],
+    "facts_used": [],
+    "grounded": False,
+    "refused": True,
+    "refusal_class": "out_of_scope",
+    "usage": {"prompt_tokens": 80, "completion_tokens": 20},
+    "retrieval": [],
+    "timings_ms": {"retrieval_ms": 8, "generation_ms": 0},
+    "prompt_version": "answer_v1",
+}
+
+
+def _fake_post(payload: dict[str, Any] | None, status: int) -> Any:
+    def _post(url: str, **_kwargs: Any) -> httpx.Response:
+        request = httpx.Request("POST", url)
+        return httpx.Response(status, json=payload, request=request)
+
+    return _post
+
+
+@pytest.fixture
+def rag_ok(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.routes.httpx.post", _fake_post(RAG_OK_PAYLOAD, 200))
+
+
+@pytest.fixture
+def rag_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.routes.httpx.post", _fake_post(RAG_REFUSAL_PAYLOAD, 200))
+
+
+@pytest.fixture
+def rag_500(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("app.routes.httpx.post", _fake_post(None, 500))

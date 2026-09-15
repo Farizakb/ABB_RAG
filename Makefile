@@ -14,5 +14,9 @@ test:
 	if [ -d services/chat ]; then PYTHONPATH=packages/contracts pytest services/chat; fi
 	if [ -d evals ]; then PYTHONPATH=services/rag:packages/contracts pytest evals; fi
 	if [ -f apps/web/package.json ]; then cd apps/web && npm test -- --run; fi
-lint:    ; ruff format --check . && ruff check . && mypy
+# mypy in two calls for the same reason as `test` above: services/rag/app and
+# services/chat/app are both top-level package `app`, so one bare `mypy`
+# invocation (which type-checks pyproject.toml's [tool.mypy] `files` list as
+# a single run) hits mypy's duplicate-module-name error.
+lint:    ; ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
 fresh:   ; docker compose down -v && $(MAKE) up
