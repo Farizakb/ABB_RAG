@@ -159,6 +159,11 @@ def seeded_interactions(db: psycopg.Connection) -> None:
     `citations` resolve against a `retrieval` entry sharing the same `n`, one
     refusal per `refusal_class`, and a question containing "kredit" for the
     search test.
+
+    P108: `retrieval` entries use the shape the write path actually persists
+    (`n`, `url`, `score`, `source_class`, taken from `data["sources"]`), not
+    rag's internal dense-candidate list -- see the `_retrieval_from_sources`
+    docstring in app/routes.py.
     """
     corpus = uuid.uuid4()
     common = ("gpt-5.6-luna", "answer_v1")
@@ -205,7 +210,14 @@ def seeded_interactions(db: psycopg.Connection) -> None:
             False,
             None,
             [1],
-            [{"n": 1, "url": "https://abb-bank.az/ferdi/kreditler/nagd-kredit"}],
+            [
+                {
+                    "n": 1,
+                    "url": "https://abb-bank.az/ferdi/kreditler/nagd-kredit",
+                    "score": 0.91,
+                    "source_class": "product",
+                }
+            ],
             400,
         ),
         _row(
@@ -216,7 +228,14 @@ def seeded_interactions(db: psycopg.Connection) -> None:
             False,
             None,
             [1],
-            [{"n": 1, "url": "https://abb-bank.az/ferdi/kartlar/kredit-kart"}],
+            [
+                {
+                    "n": 1,
+                    "url": "https://abb-bank.az/ferdi/kartlar/kredit-kart",
+                    "score": 0.87,
+                    "source_class": "product",
+                }
+            ],
             350,
         ),
         _row(

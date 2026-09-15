@@ -151,7 +151,7 @@ def _persist(
                 refusal_class,
                 error,
                 json.dumps(data.get("citations", []) if data else []),
-                json.dumps(data.get("retrieval", []) if data else []),
+                json.dumps(_retrieval_from_sources(data) if data else []),
                 json.dumps(data.get("facts_used", []) if data else []),
                 settings.llm_model,
                 data.get("prompt_version") if data else None,
@@ -164,6 +164,22 @@ def _persist(
             ),
         )
         conn.commit()
+
+
+def _retrieval_from_sources(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """P108: persist `retrieval` as the prompt sources the model actually
+    saw (`data["sources"]`), not rag's internal dense-candidate list
+    (`data.get("retrieval")`, see services/rag/app/retrieval.py's
+    `candidates`). The latter is `{document_id, url, score}` with no `n`, so
+    analytics.TOP_SOURCES's join on `(s->>'n')::int = c::int` never matched
+    anything in production -- `top_sources` was always empty. `sources` is
+    `[]` on the error/refusal paths, so this still persists `[]` there,
+    same as before.
+    """
+    return [
+        {"n": s["n"], "url": s["url"], "score": s["score"], "source_class": s["source_class"]}
+        for s in data.get("sources", [])
+    ]
 
 
 def _cost(usage: dict[str, int]) -> float:
