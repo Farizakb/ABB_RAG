@@ -29,7 +29,7 @@ from app.ingest import ingest_corpus
 from contracts.models import Corpus, Document, Fact
 from psycopg_pool import ConnectionPool
 
-MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "migrations" / "001_schema.sql"
+MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "db" / "migrations"
 TEST_DIM = 8
 
 
@@ -140,8 +140,8 @@ def _test_pool() -> Iterator[ConnectionPool]:
     with psycopg.connect(test_url, autocommit=True) as conn:
         conn.execute("DROP SCHEMA IF EXISTS rag CASCADE")
         conn.execute("DROP SCHEMA IF EXISTS app CASCADE")
-        sql = MIGRATION_PATH.read_text(encoding="utf-8").replace(":dim", str(TEST_DIM))
-        conn.execute(sql)
+        for path in sorted(MIGRATIONS_DIR.glob("*.sql")):
+            conn.execute(path.read_text(encoding="utf-8").replace(":dim", str(TEST_DIM)))
 
     pool = ConnectionPool(test_url, min_size=1, max_size=4, open=True)
     # app.db.get_conn() reads the module global `pool` at call time, so

@@ -1,6 +1,7 @@
 # services/rag/app/retrieval.py
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Collection
 from typing import Any, NamedTuple
@@ -13,15 +14,70 @@ from app.embedder import Embedder
 
 HOST = "https://abb-bank.az"
 
-SQL = """
-SELECT c.id, c.text, c.source_class, d.title, d.section_path, d.url, d.id AS doc_id,
-       1 - (c.embedding <=> %(q)s::vector) AS score
+# Azerbaijani diacritics folded away on both sides, so `neceden` reaches
+# `nəçədən`. Must stay character-identical to 002_hybrid_lexical.sql's `fold`.
+FOLD_FROM, FOLD_TO = "əıöüçşğ", "eioucsg"
+
+# Reciprocal-rank-fusion constant. 60 is the published default from the original
+# RRF paper, deliberately NOT tuned on our 43 golden rows: sweeping it over
+# 10/20/30/60 moved the result by at most one row, which is noise at this sample
+# size, and a fitted constant would be the kind of number that looks like a
+# result and is not.
+RRF_K = 60
+
+# How deep each retriever's ranked list goes before fusion.
+RANK_DEPTH = 100
+
+# Question words carry no retrieval signal but match nearly every page, so an
+# OR-query built from them ranks the corpus at random. This is a stopword list,
+# not a relevance cut -- a document-frequency cut was measured and was strictly
+# worse, because in a bank corpus the frequent terms (`kredit`, 44% of documents)
+# are exactly the discriminative ones.
+STOPWORDS = frozenset(
+    """ne nece necedir nedir hansi hansilardir var varmi ucun ile olur olar
+    mumkundur bilerem edir daha bir the what is are how can i do does of for and
+    a to in on my me""".split()  # noqa: SIM905 -- brief's exact constant, not a list literal
+)
+
+DENSE_DOCS = """
+SELECT c.document_id, max(1 - (c.embedding <=> %(q)s::vector)) AS score, d.url
 FROM rag.chunks c
+JOIN rag.corpora r ON r.id = c.corpus_id
 JOIN rag.documents d ON d.id = c.document_id
-JOIN rag.corpora r   ON r.id = c.corpus_id
 WHERE r.content_hash = %(corpus)s AND c.embedding_model = %(model)s
-ORDER BY c.embedding <=> %(q)s::vector
-LIMIT %(k)s
+GROUP BY c.document_id, d.url ORDER BY score DESC LIMIT %(k)s
+"""
+
+FTS_DOCS = """
+SELECT c.document_id,
+       max(ts_rank_cd(to_tsvector('simple', c.fold), to_tsquery('simple', %(tq)s))) AS score
+FROM rag.chunks c JOIN rag.corpora r ON r.id = c.corpus_id
+WHERE r.content_hash = %(corpus)s
+  AND to_tsvector('simple', c.fold) @@ to_tsquery('simple', %(tq)s)
+GROUP BY c.document_id ORDER BY score DESC LIMIT %(k)s
+"""
+
+TRGM_DOCS = """
+SELECT d.id,
+       word_similarity(%(q)s, translate(lower(
+           coalesce(d.title, '') || ' ' ||
+           coalesce(array_to_string(d.section_path, ' '), '') || ' ' ||
+           replace(replace(d.url, 'https://abb-bank.az/', ''), '-', ' ')
+       ), %(ff)s, %(ft)s)) AS score
+FROM rag.documents d JOIN rag.corpora r ON r.id = d.corpus_id
+WHERE r.content_hash = %(corpus)s ORDER BY score DESC LIMIT %(k)s
+"""
+
+# Returns each winning document's best chunk for this query, in the same
+# 8-column shape the Source/texts/facts code below indexes by position
+# (`r[0]`..`r[7]`) -- do not renumber those.
+BEST_CHUNKS = """
+SELECT DISTINCT ON (c.document_id)
+       c.id, c.text, c.source_class, d.title, d.section_path, d.url, c.document_id,
+       1 - (c.embedding <=> %(q)s::vector) AS score
+FROM rag.chunks c JOIN rag.documents d ON d.id = c.document_id
+WHERE c.document_id = ANY(%(ids)s) AND c.embedding_model = %(model)s
+ORDER BY c.document_id, c.embedding <=> %(q)s::vector
 """
 
 FACTS_SQL = """
@@ -76,31 +132,30 @@ def listing_url_for(url: str, known: Collection[str]) -> str:
     return parent if parent in {k.rstrip("/") for k in known} else trimmed
 
 
-def _best_per_document(rows: list[Any], k: int) -> list[Any]:
-    """Keep each document's highest-scoring chunk, so the prompt gets k distinct
-    pages instead of k chunks that may all be one page.
+def _fold(s: str) -> str:
+    return s.lower().translate(str.maketrans(FOLD_FROM, FOLD_TO))
 
-    Chunks cluster by document: measured on the live corpus, 29 of 46 golden
-    questions filled the prompt with two or more chunks of a single document,
-    which spends prompt slots on a page already represented while the page that
-    answers the question sits just below the cut. Deduping lifts recall@5 of the
-    expected page from 51% to 58% over the 43 golden rows with an expected URL,
-    and from 20% to 25% over the 20 informal/typo rows -- pure re-ranking of
-    candidates already fetched, no extra query and no re-embed.
 
-    `rows` arrives score-ordered from the SQL, so the first row seen for a
-    document is its best chunk.
+def _tsquery(question: str) -> str:
+    """An OR of prefix terms. Prefix matching is what substitutes for the
+    Azerbaijani stemmer Postgres does not have."""
+    terms = [t for t in re.findall(r"\w+", _fold(question)) if len(t) > 2 and t not in STOPWORDS]
+    # A query of nothing but stopwords must match nothing, not everything.
+    return " | ".join(f"{t}:*" for t in terms) or "zzzznomatch"
+
+
+def _rrf(*rankings: list[Any]) -> list[Any]:
+    """Reciprocal rank fusion: each list contributes 1/(RRF_K + rank) per id.
+
+    Fusing ranks rather than scores is the point -- the three retrievers produce
+    cosine similarity, ts_rank_cd and trigram similarity, which share no scale and
+    cannot be compared or averaged directly.
     """
-    out: list[Any] = []
-    seen: set[object] = set()
-    for r in rows:
-        if r[6] in seen:  # r[6] is doc_id
-            continue
-        seen.add(r[6])
-        out.append(r)
-        if len(out) == k:
-            break
-    return out
+    scores: dict[Any, float] = {}
+    for ranking in rankings:
+        for i, doc_id in enumerate(ranking):
+            scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (RRF_K + i + 1)
+    return sorted(scores, key=lambda d: -scores[d])
 
 
 def retrieve(
@@ -115,17 +170,71 @@ def retrieve(
     started = time.perf_counter()
 
     vector = embedder.embed([query])[0]
+    tsquery = _tsquery(query)
+    folded_query = _fold(query)
+
     with get_conn() as conn:
-        rows = conn.execute(
-            SQL, {"q": str(vector), "corpus": corpus_id, "model": embedder.model, "k": k_candidates}
+        dense_rows = conn.execute(
+            DENSE_DOCS,
+            {"q": str(vector), "corpus": corpus_id, "model": embedder.model, "k": RANK_DEPTH},
+        ).fetchall()
+        fts_rows = conn.execute(
+            FTS_DOCS, {"corpus": corpus_id, "tq": tsquery, "k": RANK_DEPTH}
+        ).fetchall()
+        trgm_rows = conn.execute(
+            TRGM_DOCS,
+            {
+                "q": folded_query,
+                "ff": FOLD_FROM,
+                "ft": FOLD_TO,
+                "corpus": corpus_id,
+                "k": RANK_DEPTH,
+            },
         ).fetchall()
 
-        above = _best_per_document([r for r in rows if r[7] >= settings.retrieval_floor], k_prompt)
+        dense_scores: dict[Any, float] = {doc_id: float(score) for doc_id, score, _ in dense_rows}
+
+        fused = _rrf(
+            [doc_id for doc_id, _, _ in dense_rows],
+            [doc_id for doc_id, _ in fts_rows],
+            [doc_id for doc_id, _ in trgm_rows],
+        )
+
+        # Walk fused order and keep documents whose dense score clears the
+        # floor. A document absent from the dense leg has no proven dense
+        # score and is skipped -- this is what keeps `retrieval_floor`
+        # meaningful and keeps the existing floor test honest.
+        above_ids: list[Any] = []
+        for doc_id in fused:
+            score = dense_scores.get(doc_id)
+            if score is not None and score >= settings.retrieval_floor:
+                above_ids.append(doc_id)
+            if len(above_ids) == k_prompt:
+                break
+
         known_urls = (
             {u for row in conn.execute(CORPUS_URLS_SQL, (corpus_id,)) for u in row if u}
-            if above
+            if above_ids
             else set()
         )
+
+        chunk_rows = (
+            conn.execute(
+                BEST_CHUNKS, {"ids": above_ids, "model": embedder.model, "q": str(vector)}
+            ).fetchall()
+            if above_ids
+            else []
+        )
+        by_doc = {r[6]: r for r in chunk_rows}
+        # Fused order decided *which* documents make the cut; for the citation
+        # numbering shown to the user, order the winners by their (comparable,
+        # bounded) dense score -- RRF's rank-sum has no meaning outside fusion
+        # itself and would make source 1 sometimes score lower than source 3.
+        above = sorted(
+            (by_doc[doc_id] for doc_id in above_ids if doc_id in by_doc),
+            key=lambda r: -r[7],
+        )
+
         doc_ids = [r[6] for r in above]
         facts_by_doc: dict[object, list[Fact]] = {}
         if doc_ids:
@@ -156,7 +265,8 @@ def retrieve(
         for i, r in enumerate(above)
     ]
     candidates = [
-        {"chunk_id": str(r[0]), "url": r[5], "score": round(float(r[7]), 4)} for r in rows
+        {"document_id": str(doc_id), "url": url, "score": round(float(score), 4)}
+        for doc_id, score, url in dense_rows[:k_candidates]
     ]
     texts = {i + 1: r[1] for i, r in enumerate(above)}
     return RetrievalResult(sources, candidates, int((time.perf_counter() - started) * 1000), texts)

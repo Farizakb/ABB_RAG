@@ -1,12 +1,15 @@
 # services/rag/tests/test_retrieval.py
+# ruff: noqa: RUF001 -- genuine Azerbaijani fixture/assertion text (dotless-i
+# and friends); see packages/scraper/tests/test_facts.py for the same convention.
 from __future__ import annotations
 
 from typing import Any
 
 import pytest
+from app.config import settings
 from app.embedder import FakeEmbedder
 from app.ingest import ingest_corpus
-from app.retrieval import retrieve
+from app.retrieval import _rrf, _tsquery, retrieve
 from contracts.models import Corpus, Document
 
 
@@ -19,7 +22,7 @@ def test_returns_top_k_prompt_sources_from_top_k_candidates(seeded_corpus: str, 
     assert result.candidates
     assert len(result.sources) <= len(result.candidates)
     assert len(result.sources) <= 5
-    assert len(result.candidates) <= 20
+    assert len(result.candidates) <= settings.top_k_candidates
 
 
 def test_sources_are_numbered_from_one_in_retrieval_order(seeded_corpus: str, db: Any) -> None:
@@ -205,3 +208,51 @@ def test_a_trailing_slash_in_the_corpus_still_counts_as_existing() -> None:
         )
         == "https://abb-bank.az/kampaniyalar"
     )
+
+
+def test_a_lexical_only_match_can_reach_the_prompt(
+    db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole point of hybrid retrieval: a document the lexical legs single
+    out reaches the prompt even though FakeEmbedder's hash-derived dense
+    scores give it no relative advantage over the other document. If this
+    passed with the lexical legs deleted, it would not be testing anything --
+    RRF still sums a document's presence across the FTS and trigram rankings
+    even when its dense rank is the worse of the two."""
+    docs = [
+        Document(
+            url="https://abb-bank.az/test/lexical-match",
+            title="Telefon bankçılığı",
+            section_path=["Test"],
+            source_class="product",
+            text="Telefon bankçılığı xidməti mövcuddur.",
+            content_hash="sha256:seed-lexical-match",
+        ),
+        Document(
+            url="https://abb-bank.az/test/lexical-miss",
+            title="Avtomobil sığortası",
+            section_path=["Test"],
+            source_class="product",
+            text="Avtomobil sığortası təklif olunur.",
+            content_hash="sha256:seed-lexical-miss",
+        ),
+    ]
+    corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
+    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+
+    result = retrieve(corpus_id, "telefon", FakeEmbedder(dim=8), k_candidates=10, k_prompt=1)
+
+    assert len(result.sources) == 1
+    assert result.sources[0].url == "https://abb-bank.az/test/lexical-match"
+
+
+def test_a_query_of_only_stopwords_matches_nothing_lexically() -> None:
+    """A tsquery that matched everything would rank the corpus at random."""
+    assert _tsquery("ne var hansi") == "zzzznomatch"
+
+
+def test_fusion_prefers_a_document_two_retrievers_agree_on() -> None:
+    """Direct unit test of `_rrf`, no database needed: a document ranked 2nd
+    by two lists must outrank a document ranked 1st by only a single list."""
+    fused = _rrf(["solo-best", "agreed"], ["other-best", "agreed"])
+    assert fused[0] == "agreed"
