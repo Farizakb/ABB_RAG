@@ -1,4 +1,7 @@
 # packages/scraper/abb_scraper/extract.py
+# ruff: noqa: RUF001, RUF002 -- `has_rate_table`'s docstring and detector quote
+# genuine Azerbaijani site copy, not ambiguous-character typos; same
+# convention as campaigns.py / facts.py / synthetic.py.
 from __future__ import annotations
 
 import hashlib
@@ -347,6 +350,38 @@ def strip_chrome(pages: list[tuple[str, PageText]]) -> tuple[list[tuple[str, Pag
             )
         )
     return out, removed
+
+
+RATE_NUMBER = re.compile(r"^\d+\.\d{4}$")
+
+
+def has_rate_table(text: str) -> bool:
+    """A live FX rate table, detected by shape rather than by URL.
+
+    Both halves are required. `Alış`/`Satış` alone also matches
+    /ferdi/investisiya, which legitimately discusses buying and selling; a
+    4-decimal number alone also matches dates (`09.2026`) and the miles cards'
+    `0.6667` conversion ratio. Together they matched exactly the three
+    rate-carrying pages across all 276 live documents and nothing else.
+    """
+    return (
+        "Alış" in text
+        and "Satış" in text
+        and any(RATE_NUMBER.match(line.strip()) for line in text.splitlines())
+    )
+
+
+def strip_rate_numbers(blocks: list[str]) -> list[str]:
+    """Drop the bare rate values from a page carrying a rate table.
+
+    A rate is stale the moment it is embedded (SPEC §5.4) and the model will
+    quote whatever number it is given -- measured: it answered "1.7020 AZN" from
+    a table four days old. Dropping only the bare numeric blocks leaves the
+    surrounding labels (USD, EUR, Alış, Satış) and the rest of the page intact,
+    so the assistant can still say which currencies ABB publishes and link to
+    the page, but has no number available to state as fact.
+    """
+    return [b for b in blocks if not RATE_NUMBER.match(b.strip())]
 
 
 class DropRecord(NamedTuple):

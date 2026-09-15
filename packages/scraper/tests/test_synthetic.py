@@ -1,5 +1,6 @@
 # packages/scraper/tests/test_synthetic.py
 # ruff: noqa: RUF001 -- genuine Azerbaijani fixture/test text.
+import re
 from datetime import date
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from abb_scraper.synthetic import (
     bank_facts_document,
     index_documents,
     listing_enumerates,
+    pointer_documents,
 )
 from contracts.models import Document, SourceClass
 
@@ -192,3 +194,67 @@ def test_exactly_at_the_060_threshold_counts_as_already_enumerates() -> None:
         )
         is True
     )
+
+
+# --------------------------------------------------- Task 23 Item 3 Part B: pointers
+#
+# SPEC §5.5's pre-commitment: "No pointer unless the §5.5 bank-facts document
+# fails to produce a plausible grounded answer." Measured, live, 2026-09-15: it
+# fails for branch and ATM location questions -- either a refusal citing
+# unrelated pages, or (worse) a grounded-looking answer citing the Android
+# privacy policy. The branch/ATM list is a client-side map widget, so no
+# address is ever present in the fetched HTML for retrieval to find.
+
+
+def test_pointer_bodies_state_no_number_and_no_product_fact() -> None:
+    """SPEC §5.5's constraint on any hand-authored pointer: it may state that
+    a page exists and what it lists, and must never state a product fact.
+    Checked with no scraped /atmler present, so both pointers are their own,
+    unmerged text -- the standalone form the constraint is written about."""
+    pointers = pointer_documents([])
+    assert {d.url for d in pointers} == {
+        "https://abb-bank.az/filiallar",
+        "https://abb-bank.az/atmler",
+    }
+    for d in pointers:
+        assert "%" not in d.text
+        assert "AZN" not in d.text
+        assert not re.search(r"\d{3,}", d.text), d.text
+
+
+def test_pointer_documents_never_duplicates_a_scraped_url() -> None:
+    """Retrieval chunks by URL (corpus.py), so two documents at the same URL
+    would silently shadow one of them. `/atmler` is a real scraped usage-FAQ
+    page (deposit methods, limits, commissions -- no locations); its pointer
+    must not be emitted as a second, competing document at that URL."""
+    atmler = doc(
+        "https://abb-bank.az/atmler",
+        "Bankomatlar haqqında suallar",
+        "stub",
+    )
+    scraped = [atmler]
+    pointers = pointer_documents(scraped)
+    urls = [d.url for d in pointers]
+    assert len(urls) == len(set(urls))
+
+    combined = [d for d in scraped if d.url not in urls] + pointers
+    combined_urls = [d.url for d in combined]
+    assert len(combined_urls) == len(set(combined_urls)), combined_urls
+
+
+def test_atmler_pointer_text_is_merged_into_the_scraped_atmler_document() -> None:
+    """The pointer text is appended to the real page's own text rather than
+    emitted twice -- both the existing FAQ content and the new pointer
+    sentence must survive in the single document that reaches the corpus."""
+    atmler = Document(
+        url="https://abb-bank.az/atmler",
+        title="Bankomatlar haqqında suallar",
+        section_path=["Fərdi"],
+        source_class="stub",
+        text="Bankomatdan pul çıxarmaq üçün kartınızı daxil edin.",
+        content_hash="sha256:atmler-faq",
+    )
+    pointers = pointer_documents([atmler])
+    merged = next(d for d in pointers if d.url == "https://abb-bank.az/atmler")
+    assert "Bankomatdan pul çıxarmaq üçün kartınızı daxil edin." in merged.text
+    assert "Bankomatların ünvanları bu sənəddə saxlanılmır" in merged.text

@@ -15,11 +15,13 @@ from abb_scraper.extract import (
     dedupe_blocks,
     extract_page,
     faq_blocks,
+    has_rate_table,
     strip_chrome,
+    strip_rate_numbers,
 )
 from abb_scraper.facts import extract_facts, reassemble
 from abb_scraper.fetcher import FetchResult
-from abb_scraper.synthetic import bank_facts_document, index_documents
+from abb_scraper.synthetic import bank_facts_document, index_documents, pointer_documents
 from contracts.models import Corpus, Document, Fact
 
 VOLATILE_PATHS = ("/ferdi/valyuta-mezenneleri",)
@@ -81,6 +83,25 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
             homepage_html = res.html
         sc = _source_class(path)
         page = extract_page(res.html, res.url)
+
+        if has_rate_table(page.text):
+            # A live FX rate table, stripped wherever the widget is embedded
+            # (SPEC §5.4) -- not just on /ferdi/valyuta-mezenneleri's own
+            # volatile page below. Measured 2026-09-15: two more pages carry
+            # the identical widget and reach the corpus as ordinary "stub"
+            # pages, one of them (/ferdi) a real landing page whose
+            # product-card prose must survive -- so only the bare numbers are
+            # dropped and the rest of the page is kept, unlike the volatile
+            # branch's pointer mode which discards the whole body. Runs
+            # before source-class branching so it reaches every class; for
+            # the volatile page itself this is a no-op, since the branch
+            # below replaces these blocks outright regardless.
+            stripped = strip_rate_numbers(list(page.block_texts))
+            body = "\n".join(stripped)
+            text = "\n".join(page.head + tuple(stripped))
+            page = page._replace(
+                text=text, body=body, char_count=len(text), block_texts=tuple(stripped)
+            )
 
         if sc == "volatile":
             # Pointer mode: title and description only, rate body discarded
@@ -182,6 +203,17 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
     indexes = index_documents(docs)
     shadowed = {d.url for d in indexes}
     docs = [d for d in docs if d.url not in shadowed] + indexes
+
+    # Task 23 Item 3 Part B: hand-authored pointers for branch/ATM location
+    # questions, which the scrape cannot answer (client-side map widget, no
+    # addresses ever reach the HTML). `pointer_documents` already resolves the
+    # /atmler URL collision -- it returns that page's own Document with the
+    # pointer text appended when it is present in `docs`, so shadowing here
+    # replaces rather than duplicates it, the same mechanism used for the
+    # campaign index above.
+    pointers = pointer_documents(docs)
+    pointer_urls = {d.url for d in pointers}
+    docs = [d for d in docs if d.url not in pointer_urls] + pointers
 
     corpus = Corpus(
         scraped_at=datetime.now(UTC),

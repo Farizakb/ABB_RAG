@@ -83,6 +83,89 @@ def bank_facts_document(homepage_html: str) -> Document | None:
     return None
 
 
+FILIALLAR_URL = f"{HOST}/filiallar"
+ATMLER_URL = f"{HOST}/atmler"
+
+FILIALLAR_TEXT = (
+    "Filiallar və bankomatlar\n"
+    "ABB-nin filial və bankomat şəbəkəsi bankın saytındakı filiallar səhifəsində "
+    'və ABB mobile tətbiqinin "Xidmət şəbəkəsi (filial, şöbə, bankomat)" '
+    "bölməsində xəritə üzərində göstərilir.\n"
+    "Həmin səhifə filialların ünvanlarını, iş saatlarını və bankomatların "
+    "yerləşdiyi nöqtələri sadalayır.\n"
+    "Ünvanlar və iş saatları bu sənəddə saxlanılmır, çünki onlar xəritə üzərində "
+    "canlı göstərilir. Ən yaxın filialı və ya bankomatı tapmaq üçün həmin "
+    "səhifəyə və ya ABB mobile tətbiqinə baxın."
+)
+
+ATMLER_POINTER_TEXT = (
+    "Bankomatların yerləşdiyi yerlər\n"
+    "ABB bankomatlarının yerləşdiyi nöqtələr xəritə üzərində filiallar "
+    "səhifəsində və ABB mobile tətbiqində göstərilir.\n"
+    "Bankomatların ünvanları bu sənəddə saxlanılmır. Bankomatın harada olduğunu "
+    "öyrənmək üçün həmin səhifəyə və ya tətbiqə baxın."
+)
+
+
+def pointer_documents(docs: list[Document]) -> list[Document]:
+    """SPEC §5.5 day-two pre-commitment, triggered: Task 23 Item 3 measured that
+    the §5.5 bank-facts document does not produce a plausible grounded answer to
+    a branch or ATM question -- live probes either refuse (citing unrelated
+    pages) or, worse, cite the Android privacy policy for "where is the nearest
+    ATM". The branch/ATM list is a client-side map widget on abb-bank.az, so no
+    address is ever present in the fetched HTML for retrieval to find (measured:
+    /filiallar has exactly one occurrence of "ünvan" and zero street addresses).
+
+    Both pointers state only that a page exists and what it lists, never a
+    product fact (SPEC §5.5's constraint on any hand-authored pointer) -- no
+    address, no hours, no phone number is invented here. Both URLs returned
+    HTTP 200 at scrape time (both are in `data/raw`), so invariant 12 holds.
+
+    `/filiallar` never survives the §5.3 gate (measured: one real body block,
+    under MIN_CHARS), so its pointer is always a new Document. `/atmler` DOES
+    survive -- it is kept as an ordinary "stub" page carrying a usage FAQ
+    (deposit methods, limits, commissions) but no locations -- so a second
+    Document at that URL would silently shadow one of them in retrieval, which
+    chunks by URL. Handled explicitly: when `/atmler` is present in `docs`, its
+    own Document is returned here with the pointer text appended (for
+    `build_corpus` to shadow-replace the original with, the same mechanism
+    `index_documents` uses for /ferdi/kampaniyalar) rather than emitted as a
+    second, competing document.
+    """
+    pointers = [
+        Document(
+            url=FILIALLAR_URL,
+            title="Filiallar və bankomatlar",
+            section_path=["Fərdi"],
+            source_class="index",
+            text=FILIALLAR_TEXT,
+            content_hash=_hash(FILIALLAR_TEXT),
+        )
+    ]
+
+    existing_atmler = next((d for d in docs if d.url.rstrip("/") == ATMLER_URL), None)
+    if existing_atmler is None:
+        pointers.append(
+            Document(
+                url=ATMLER_URL,
+                title="Bankomatların yerləşdiyi yerlər",
+                section_path=["Fərdi"],
+                source_class="index",
+                text=ATMLER_POINTER_TEXT,
+                content_hash=_hash(ATMLER_POINTER_TEXT),
+            )
+        )
+    else:
+        merged_text = f"{existing_atmler.text}\n{ATMLER_POINTER_TEXT}"
+        pointers.append(
+            existing_atmler.model_copy(
+                update={"text": merged_text, "content_hash": _hash(merged_text)}
+            )
+        )
+
+    return pointers
+
+
 def _index_doc(title: str, url: str, rows: list[str], section_path: list[str]) -> Document:
     text = f"{title}\n" + "\n".join(rows)
     return Document(

@@ -1,5 +1,5 @@
 # packages/scraper/tests/test_corpus.py
-# ruff: noqa: RUF001 -- genuine Azerbaijani text, not ambiguous-
+# ruff: noqa: RUF001, RUF002 -- genuine Azerbaijani text, not ambiguous-
 # character typos; see campaigns.py / facts.py for the same convention.
 import json
 from datetime import date
@@ -8,6 +8,7 @@ from abb_scraper.corpus import build_corpus
 from abb_scraper.extract import content_blocks, dedupe_blocks
 from abb_scraper.facts import extract_facts
 from abb_scraper.fetcher import FetchResult
+from contracts.models import Corpus, Document
 
 TODAY = date(2026, 9, 14)
 
@@ -25,13 +26,26 @@ def page(title: str, body_chars: int = 900) -> str:
     )
 
 
+# Task 23 Item 3 Part B: `pointer_documents` unconditionally adds these two
+# hand-authored pointers to every corpus (SPEC §5.5 -- ABB's branch/ATM
+# situation does not depend on which pages a given scrape happened to fetch).
+# Tests below that assert "nothing reaches the corpus" from these tiny,
+# single-page fixtures predate Part B and must now look past the pointers to
+# the pages they are actually pinning the drop behaviour of.
+POINTER_URLS = {"https://abb-bank.az/filiallar", "https://abb-bank.az/atmler"}
+
+
+def non_pointer_docs(corpus: Corpus) -> list[Document]:
+    return [d for d in corpus.documents if d.url not in POINTER_URLS]
+
+
 # ------------------------------------------------------------- brief's own tests
 
 
 def test_expired_campaign_never_reaches_the_corpus() -> None:
     results = [r("/kampaniyalar/old", page("Köhnə").replace("</p>", "01.12.2021 - 10.01.2022</p>"))]
     corpus, dropped = build_corpus(results, TODAY)
-    assert corpus.documents == []
+    assert non_pointer_docs(corpus) == []
     assert dropped[0].reason == "campaign-expired"
 
 
@@ -73,7 +87,7 @@ def test_unknown_campaign_with_no_date_range_is_dropped_and_reported() -> None:
     html = page("Naməlum kampaniya")  # no dd.mm.yyyy range anywhere in the body
     results = [r("/kampaniyalar/no-dates", html)]
     corpus, dropped = build_corpus(results, TODAY)
-    assert corpus.documents == []
+    assert non_pointer_docs(corpus) == []
     assert dropped[0].reason == "campaign-unknown"
 
 
@@ -84,7 +98,7 @@ def test_future_dated_campaign_is_dropped_as_unknown_not_active() -> None:
     html = page("Gələcək kampaniya").replace("</p>", "01.10.2026 - 31.10.2026</p>")
     results = [r("/kampaniyalar/future", html)]
     corpus, dropped = build_corpus(results, TODAY)
-    assert corpus.documents == []
+    assert non_pointer_docs(corpus) == []
     assert dropped[0].reason == "campaign-unknown"
     assert dropped[0].url.endswith("/kampaniyalar/future")
 
@@ -193,7 +207,7 @@ def test_cross_block_duplicate_facts_collapse_to_one_row() -> None:
 def test_under_min_char_pages_are_dropped_via_build_corpus() -> None:
     results = [r("/empty", page("Boş", body_chars=10))]
     corpus, dropped = build_corpus(results, TODAY)
-    assert corpus.documents == []
+    assert non_pointer_docs(corpus) == []
     assert dropped[0].reason == "under-min-chars"
 
 
@@ -201,14 +215,14 @@ def test_cross_document_duplicate_bodies_are_dropped_via_build_corpus() -> None:
     html = page("Eyni məzmun")
     results = [r("/ferdi/a", html), r("/ferdi/b", html)]
     corpus, dropped = build_corpus(results, TODAY)
-    assert len(corpus.documents) == 1
+    assert len(non_pointer_docs(corpus)) == 1
     assert dropped[0].reason == "cross-document-duplicate"
 
 
 def test_non_200_results_are_dropped_with_their_status() -> None:
     results = [FetchResult("https://abb-bank.az/gone", "https://abb-bank.az/gone", 404, "", False)]
     corpus, dropped = build_corpus(results, TODAY)
-    assert corpus.documents == []
+    assert non_pointer_docs(corpus) == []
     assert dropped[0].reason == "status-404"
 
 
@@ -256,6 +270,87 @@ def test_no_two_documents_ever_share_a_url() -> None:
     hub = [d for d in corpus.documents if d.url.endswith("/ferdi/kampaniyalar")]
     assert len(hub) == 1 and hub[0].source_class == "index", "the enumerating index must win"
     assert "aktiv" in hub[0].text.lower()
+
+
+# ------------------------------------------------------ Task 23 Item 3 Part A
+
+
+def test_rate_table_numbers_are_stripped_but_prose_survives() -> None:
+    """Live-probed 2026-09-15: the assistant quoted a four-day-stale USD rate
+    as fact from a page whose table is stamped `Son yenilənmə: 11.09.2026`.
+    The same rate widget ABB embeds on /ferdi/valyuta-mezenneleri also appears
+    on ordinary pages -- measured: /ferdi, and the two live-mezenne-converter
+    stubs. Detected by shape (Alış + Satış + a 4-decimal number), not by URL,
+    and only the bare numeric line is dropped -- the page's own prose must
+    still reach the corpus."""
+    html = (
+        "<html><head><title>ABB Fərdi</title>"
+        '<meta name="description" content="Fərdi məhsullar haqqında məlumat">'
+        "</head><body><h1>ABB Fərdi</h1>"
+        "<p>Alış</p><p>Satış</p><p>1.7020</p>"
+        f"<p>{'x' * 400}</p></body></html>"
+    )
+    corpus, _ = build_corpus([r("/ferdi", html)], TODAY)
+    doc = corpus.documents[0]
+    assert "1.7020" not in doc.text
+    assert "x" * 400 in doc.text
+
+
+def test_alis_satis_without_a_rate_number_is_left_untouched() -> None:
+    """The false positive `has_rate_table`'s conjunction exists to exclude:
+    /ferdi/investisiya legitimately discusses buying and selling securities
+    (Alış/Satış) without ever carrying a live rate figure. `Alış`/`Satış`
+    alone matched 4 docs corpus-wide; neither half of the detector is usable
+    alone."""
+    html = (
+        "<html><head><title>İnvestisiya</title>"
+        '<meta name="description" content="İnvestisiya məhsulları haqqında">'
+        "</head><body><h1>İnvestisiya</h1>"
+        "<p>Alış qiyməti barədə məlumat</p><p>Satış qiyməti barədə məlumat</p>"
+        f"<p>{'y' * 400}</p></body></html>"
+    )
+    corpus, _ = build_corpus([r("/ferdi/investisiya", html)], TODAY)
+    doc = corpus.documents[0]
+    assert "Alış qiyməti barədə məlumat" in doc.text
+    assert "Satış qiyməti barədə məlumat" in doc.text
+
+
+def test_a_bare_decimal_number_without_alis_satis_is_left_untouched() -> None:
+    """The other false positive the conjunction excludes: a 4-decimal number
+    alone matched 17 docs corpus-wide, including the miles cards' 0.6667
+    conversion ratio and bare dates like 09.2026 -- neither carries a rate
+    table and neither may be touched."""
+    html = (
+        "<html><head><title>Miles kartı</title>"
+        '<meta name="description" content="Miles kartı haqqında məlumat">'
+        "</head><body><h1>Miles kartı</h1>"
+        "<p>0.6667</p>"
+        f"<p>{'z' * 400}</p></body></html>"
+    )
+    corpus, _ = build_corpus([r("/ferdi/miles-karti", html)], TODAY)
+    doc = corpus.documents[0]
+    assert "0.6667" in doc.text
+
+
+def test_rate_table_page_keeps_its_product_card_prose_not_pointer_mode() -> None:
+    """/ferdi is a real landing page (Nağd kredit, Tam Visa, Biznes kartı,
+    DigiTravel product cards, measured 4,023 extracted chars) that happens to
+    embed the rate widget -- stripping the numbers must not collapse it into
+    pointer mode the way /ferdi/valyuta-mezenneleri's own volatile branch
+    does; that would destroy genuine landing-page content."""
+    html = (
+        "<html><head><title>ABB Fərdi</title>"
+        '<meta name="description" content="Fərdi məhsullar haqqında məlumat">'
+        "</head><body><h1>ABB Fərdi</h1>"
+        "<p>Alış</p><p>Satış</p><p>1.9334</p>"
+        "<p>Nağd kredit əldə edin</p>"
+        f"<p>{'w' * 400}</p></body></html>"
+    )
+    corpus, _ = build_corpus([r("/ferdi", html)], TODAY)
+    doc = corpus.documents[0]
+    assert doc.source_class != "volatile"
+    assert "Nağd kredit əldə edin" in doc.text
+    assert "1.9334" not in doc.text
 
 
 def _flight_faq(slug: str, question: str, answer: str) -> str:
