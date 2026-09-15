@@ -43,6 +43,13 @@ class RetrievalResult(NamedTuple):
     sources: list[Source]
     candidates: list[dict[str, object]]
     took_ms: int
+    # Task D: built from the same `above` rows as `sources`, keyed by `n` (unique
+    # by construction -- `n` is `i + 1` over `above`) instead of a second query
+    # keyed by URL. The old `source_texts()` collapsed same-document chunks onto
+    # whichever one a URL-keyed dict fetched last -- measured on the live corpus,
+    # 29 of 46 golden questions had >=1 chunk's text discarded this way (see
+    # task-D-brief.md). Field added last so positional unpacking still works.
+    texts: dict[int, str]
 
 
 def listing_url_for(url: str, known: Collection[str]) -> str:
@@ -124,18 +131,5 @@ def retrieve(
     candidates = [
         {"chunk_id": str(r[0]), "url": r[5], "score": round(float(r[7]), 4)} for r in rows
     ]
-    return RetrievalResult(sources, candidates, int((time.perf_counter() - started) * 1000))
-
-
-def source_texts(corpus_id: str, sources: list[Source], embedder: Embedder) -> dict[int, str]:
-    """Chunk text for the prompt, fetched separately so `Source` stays serialisable
-    to the browser without shipping the whole passage."""
-    with get_conn() as conn:
-        rows = conn.execute(
-            "SELECT d.url, c.text FROM rag.chunks c JOIN rag.documents d ON d.id = c.document_id "
-            "JOIN rag.corpora r ON r.id = c.corpus_id "
-            "WHERE r.content_hash = %s AND c.embedding_model = %s AND d.url = ANY(%s)",
-            (corpus_id, embedder.model, [s.url for s in sources]),
-        ).fetchall()
-    by_url = {url: text for url, text in rows}
-    return {s.n: by_url.get(s.url, "") for s in sources}
+    texts = {i + 1: r[1] for i, r in enumerate(above)}
+    return RetrievalResult(sources, candidates, int((time.perf_counter() - started) * 1000), texts)

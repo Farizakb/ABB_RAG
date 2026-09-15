@@ -15,7 +15,7 @@ from pydantic import BaseModel, ValidationError
 
 from app.config import settings
 from app.embedder import Embedder
-from app.retrieval import retrieve, source_texts
+from app.retrieval import retrieve
 
 PROMPT_VERSION = "answer_v1"
 SYSTEM = (pathlib.Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md").read_text("utf-8")
@@ -152,7 +152,7 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
         early_klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
         return _refuse([], early_klass, r.candidates, {**timings, "generation_ms": 0}, {})
 
-    prompt = build_prompt(question, r.sources, source_texts(corpus_id, r.sources, embedder))
+    prompt = build_prompt(question, r.sources, r.texts)
 
     started = time.perf_counter()
     raw, usage = client.complete(prompt)

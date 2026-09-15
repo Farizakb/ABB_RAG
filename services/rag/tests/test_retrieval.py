@@ -5,7 +5,9 @@ from typing import Any
 
 import pytest
 from app.embedder import FakeEmbedder
+from app.ingest import ingest_corpus
 from app.retrieval import retrieve
+from contracts.models import Corpus, Document
 
 
 def test_returns_top_k_prompt_sources_from_top_k_candidates(seeded_corpus: str, db: Any) -> None:
@@ -96,6 +98,54 @@ def test_a_trim_that_is_not_in_the_corpus_falls_back_to_the_page_itself() -> Non
         listing_url_for(deep, {"https://abb-bank.az/haqqimizda/satinalmalar"})
         == "https://abb-bank.az/haqqimizda/satinalmalar"
     )
+
+
+def test_each_chunk_of_the_same_document_keeps_its_own_text(
+    db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Task D regression. Measured on the live corpus 6fcf823c... over the 45
+    golden questions plus the known-failing valyuta question: 29 of 46 were
+    affected by the old `source_texts()`, which keyed its lookup dict by URL
+    -- so when several chunks of the same document ranked in the same top-k
+    (routine: worst case 5 sources sharing 1 distinct text, see
+    task-D-brief.md's table), every chunk but the last-fetched one had its
+    text discarded before the prompt was built.
+
+    Seeds one document with 3 chunks of distinct text (each section alone
+    exceeds CHUNK_TOKENS, so `chunk_document` never merges or overlaps them),
+    retrieves all 3 into the prompt (k_prompt=3), and asserts each source's
+    text is its own chunk's -- not collapsed onto another's.
+    """
+    doc = Document(
+        url="https://abb-bank.az/test/multi-chunk",
+        title="Çoxfəsilli sənəd",
+        section_path=["Test"],
+        source_class="product",
+        text="\n".join(["birinci " * 700, "ikinci " * 700, "üçüncü " * 700]),
+        content_hash="sha256:seed-multi-chunk",
+    )
+    corpus_id = ingest_corpus(Corpus(documents=[doc]), FakeEmbedder(dim=8))
+    # FakeEmbedder's cosine scores are hash-derived, not query-relevant, so a
+    # chunk can legitimately score below 0. Floor to -2.0 (below the [-1, 1]
+    # range) so all 3 chunks clear it regardless of sign -- same technique as
+    # test_floor_filters_candidates_below_threshold -- isolating the collapse
+    # bug under test from floor filtering.
+    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+
+    result = retrieve(corpus_id, "kredit", FakeEmbedder(dim=8), k_candidates=10, k_prompt=3)
+
+    assert len(result.sources) == 3
+    assert set(result.texts) == {s.n for s in result.sources}
+    distinct = {result.texts[s.n] for s in result.sources}
+    assert len(distinct) == 3, f"expected 3 distinct texts, got {distinct}"
+
+
+def test_texts_is_empty_when_no_source_clears_the_floor(
+    seeded_corpus: str, db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
+    result = retrieve(seeded_corpus, "kredit", FakeEmbedder(dim=8))
+    assert result.sources == [] and result.texts == {}
 
 
 def test_a_trailing_slash_in_the_corpus_still_counts_as_existing() -> None:
