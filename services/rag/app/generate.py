@@ -51,10 +51,17 @@ class OpenAIClient:
         self._c = OpenAI(api_key=settings.openai_api_key)
 
     def complete(self, prompt: str) -> tuple[str, dict[str, int]]:
+        # No `temperature`: the configured model rejects it outright --
+        # 400 "Unsupported parameter: 'temperature' is not supported with this
+        # model" -- and every /answer call 500'd on the first live request
+        # (2026-09-15). Tests never caught it because they substitute
+        # `FakeClient` for this class, so this line is only exercised against
+        # the real API. Determinism does not depend on it here: the response is
+        # pinned by a strict json_schema, and grounding is enforced by the
+        # cited-or-refused contract in `answer()`, not by sampling temperature.
         r = self._c.responses.create(
             model=settings.llm_model,
             input=prompt,
-            temperature=0,
             max_output_tokens=settings.max_output_tokens,
             text={
                 "format": {
