@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import time
 from collections.abc import Collection
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
 from contracts.models import Fact, Source
 
@@ -76,6 +76,33 @@ def listing_url_for(url: str, known: Collection[str]) -> str:
     return parent if parent in {k.rstrip("/") for k in known} else trimmed
 
 
+def _best_per_document(rows: list[Any], k: int) -> list[Any]:
+    """Keep each document's highest-scoring chunk, so the prompt gets k distinct
+    pages instead of k chunks that may all be one page.
+
+    Chunks cluster by document: measured on the live corpus, 29 of 46 golden
+    questions filled the prompt with two or more chunks of a single document,
+    which spends prompt slots on a page already represented while the page that
+    answers the question sits just below the cut. Deduping lifts recall@5 of the
+    expected page from 51% to 58% over the 43 golden rows with an expected URL,
+    and from 20% to 25% over the 20 informal/typo rows -- pure re-ranking of
+    candidates already fetched, no extra query and no re-embed.
+
+    `rows` arrives score-ordered from the SQL, so the first row seen for a
+    document is its best chunk.
+    """
+    out: list[Any] = []
+    seen: set[object] = set()
+    for r in rows:
+        if r[6] in seen:  # r[6] is doc_id
+            continue
+        seen.add(r[6])
+        out.append(r)
+        if len(out) == k:
+            break
+    return out
+
+
 def retrieve(
     corpus_id: str,
     query: str,
@@ -93,7 +120,7 @@ def retrieve(
             SQL, {"q": str(vector), "corpus": corpus_id, "model": embedder.model, "k": k_candidates}
         ).fetchall()
 
-        above = [r for r in rows if r[7] >= settings.retrieval_floor][:k_prompt]
+        above = _best_per_document([r for r in rows if r[7] >= settings.retrieval_floor], k_prompt)
         known_urls = (
             {u for row in conn.execute(CORPUS_URLS_SQL, (corpus_id,)) for u in row if u}
             if above

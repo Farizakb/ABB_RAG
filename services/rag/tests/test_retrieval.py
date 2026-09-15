@@ -111,20 +111,25 @@ def test_each_chunk_of_the_same_document_keeps_its_own_text(
     task-D-brief.md's table), every chunk but the last-fetched one had its
     text discarded before the prompt was built.
 
-    Seeds one document with 3 chunks of distinct text (each section alone
-    exceeds CHUNK_TOKENS, so `chunk_document` never merges or overlaps them),
-    retrieves all 3 into the prompt (k_prompt=3), and asserts each source's
-    text is its own chunk's -- not collapsed onto another's.
+    Seeds THREE documents, one chunk each, so all three reach the prompt under
+    `_best_per_document`, and asserts each source's text is its own -- not
+    collapsed onto another's. (Before document dedup this test used one
+    document with three chunks; dedup now keeps only a document's best chunk,
+    so the collapse is provoked across documents instead. The property under
+    test is unchanged: a source never carries another source's text.)
     """
-    doc = Document(
-        url="https://abb-bank.az/test/multi-chunk",
-        title="Çoxfəsilli sənəd",
-        section_path=["Test"],
-        source_class="product",
-        text="\n".join(["birinci " * 700, "ikinci " * 700, "üçüncü " * 700]),
-        content_hash="sha256:seed-multi-chunk",
-    )
-    corpus_id = ingest_corpus(Corpus(documents=[doc]), FakeEmbedder(dim=8))
+    docs = [
+        Document(
+            url=f"https://abb-bank.az/test/multi-chunk-{i}",
+            title=f"Çoxfəsilli sənəd {i}",
+            section_path=["Test"],
+            source_class="product",
+            text=word * 700,
+            content_hash=f"sha256:seed-multi-chunk-{i}",
+        )
+        for i, word in enumerate(("birinci ", "ikinci ", "üçüncü "))
+    ]
+    corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
     # FakeEmbedder's cosine scores are hash-derived, not query-relevant, so a
     # chunk can legitimately score below 0. Floor to -2.0 (below the [-1, 1]
     # range) so all 3 chunks clear it regardless of sign -- same technique as
@@ -138,6 +143,49 @@ def test_each_chunk_of_the_same_document_keeps_its_own_text(
     assert set(result.texts) == {s.n for s in result.sources}
     distinct = {result.texts[s.n] for s in result.sources}
     assert len(distinct) == 3, f"expected 3 distinct texts, got {distinct}"
+
+
+def test_prompt_gets_distinct_documents_not_several_chunks_of_one(
+    db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured on the live corpus: 29 of 46 golden questions filled the prompt
+    with two or more chunks of a single document, spending prompt slots on a
+    page already represented while the page that answers the question sat below
+    the cut. Keeping each document's best chunk lifted recall@5 of the expected
+    page from 51% to 58% over the 43 golden rows carrying an expected URL, and
+    from 20% to 25% over the 20 informal/typo rows.
+
+    One document of 3 chunks must therefore contribute exactly one source, and a
+    second document must get a slot rather than being crowded out."""
+    docs = [
+        Document(
+            url="https://abb-bank.az/test/long-page",
+            title="Uzun səhifə",
+            section_path=["Test"],
+            source_class="product",
+            text="\n".join(["birinci " * 700, "ikinci " * 700, "üçüncü " * 700]),
+            content_hash="sha256:seed-long-page",
+        ),
+        Document(
+            url="https://abb-bank.az/test/other-page",
+            title="Başqa səhifə",
+            section_path=["Test"],
+            source_class="product",
+            text="dördüncü " * 700,
+            content_hash="sha256:seed-other-page",
+        ),
+    ]
+    corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
+    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+
+    result = retrieve(corpus_id, "kredit", FakeEmbedder(dim=8), k_candidates=10, k_prompt=3)
+
+    urls = [s.url for s in result.sources]
+    assert len(urls) == len(set(urls)), f"a document appears twice: {urls}"
+    assert set(urls) == {
+        "https://abb-bank.az/test/long-page",
+        "https://abb-bank.az/test/other-page",
+    }
 
 
 def test_texts_is_empty_when_no_source_clears_the_floor(
