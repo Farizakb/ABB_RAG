@@ -253,8 +253,10 @@ denominator makes the figure noisy; it is not evidence the mechanism itself is b
 shipping corpus `90e08090…` with `scripts/ablate_retrieval.py`): hit@5 **79% (34/43)** overall,
 **65% (13/20)** on the informal/typo subset, dense-only alone scores 65%/40% on the same splits —
 fusion's 14-point gain is why the lexical channel ships. A held-out set (`evals/heldout.jsonl`, 15
-questions written by the project owner from corpus text, never used to tune retrieval) scores
-**57% (8/14)**, evidence the golden set is not overfit. The day-three bake-off that decided
+questions written by the project owner from corpus text, never used to tune retrieval; 14
+answerable + 1 out-of-scope) scores **57% (8/14)**. That is well below the golden set's 79%,
+so part of the golden-set number reflects tuning on those questions, and 57% is the more
+honest estimate for unseen phrasing. The day-three bake-off that decided
 dense-vs-fused: dense 28/43, lexical legs 24/43 (FTS) and 22/43 (trigram), **fused 34/43** — fusion
 ships on that measurement, comfortably clearing the pre-committed 2-point bar.
 
@@ -362,7 +364,7 @@ sequenceDiagram
     R->>D: dense pgvector cosine, plus FTS, plus pg_trgm -- RANK_DEPTH=100
     Note over R: Reciprocal Rank Fusion, RRF_K=60, then keep only docs with a dense-leg score, top 5 into the prompt
     R->>D: join rag.product_facts for those documents
-    R->>O: generate -- temperature=0, strict JSON schema
+    R->>O: generate -- strict JSON schema
     Note over R: citations must resolve to supplied sources; zero resolving citations is a refusal
     R-->>C: answer, citations, grounded, refused, refusal_class, usage, timings_ms
     C->>D: INSERT app.interactions -- exactly one row, including refusals and errors
@@ -387,7 +389,8 @@ citation, or an explicit refusal. There is no third state for a bank question.**
 - The model returns strict-schema JSON: `answer`, `citations`, `grounded`, `intent`.
 - Citation indices must resolve to sources actually supplied; an unresolvable index is dropped,
   and zero remaining citations is a refusal.
-- `temperature=0`, capped output tokens, capped input length, single-turn (see
+- No `temperature` parameter (the configured model rejects it with a 400), so output shape is
+  pinned by a strict JSON schema and grounding by the cited-or-refused check. Capped output tokens, capped input length, single-turn (see
   [conversation continuity](#conversation-continuity--recorded-not-replayed) below).
 - **Retrieved text is data, never instruction.** It is wrapped in explicit delimiters and the
   model is told its content is reference material, not directions. The app exposes no tools and
@@ -396,7 +399,9 @@ citation, or an explicit refusal. There is no third state for a bank question.**
 
 ### Refusal classes
 
-Two refusal classes, both shown with their sources rather than as a dead end:
+Two refusal classes are produced, both shown with their sources rather than as a dead end. The
+contract also defines a third, `unsafe`, which analytics already counts per day, but no code
+path emits it yet. It is reserved for an input/output moderation layer.
 
 - **`out_of_scope`** — the question cannot be answered from ABB's published pages, or the
   retrieval floor rejected it before an API call. Refusal copy names ABB's real channels: the 937
