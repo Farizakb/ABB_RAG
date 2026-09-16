@@ -1,0 +1,31 @@
+# Pinned for scripts/verify_gate.py (Task 1, SPEC §2 verification gate).
+httpx==0.28.1
+openai==3.13.0
+
+# Task 2: test and lint toolchain (make test / make lint / CI).
+pytest==9.1.1
+ruff==0.14.14
+mypy==2.3.1
+pre-commit==4.6.2
+
+# Task 4: packages/contracts models (rag/chat shared schema).
+pydantic==2.13.5
+
+# Task 16: services/rag/conftest.py builds and migrates a `*_test` database
+# directly from the host to run ingest tests (P68) -- needs psycopg on the
+# host even though it's already pinned in services/rag/requirements.txt for
+# the container. Pins match that file exactly.
+psycopg[binary]==3.3.5
+psycopg-pool==3.3.1
+
+# Task 5: packages/scraper sitemap filter (SPEC §5.2).
+# httpx is already pinned above (Task 1); reused here for fetch_sitemap's client param.
+# selectolax: fast (Lexbor-backed) HTML/XML parser used to parse sitemap.xml's <url>/
+# <loc>/<lastmod> nodes in fetch_sitemap. New dependency for this task.
+selectolax==0.4.11
+
+# Task 6: packages/scraper polite fetcher (SPEC §5.1).
+# protego: stdlib urllib.robotparser is first-match-wins (1994 draft), which on ABB's
+# actual robots.txt allows /cgi-bin/ despite its Disallow; protego implements RFC 9309
+# most-specific-match.
+protego==0.6.2

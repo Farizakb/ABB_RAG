@@ -1,0 +1,7 @@
+/* apps/web/src/index.css
+   Tailwind entry point. theme.css (imported after) carries the actual
+   design tokens and the ledger-specific resets; this file only wires
+   Tailwind's layers so tailwind.config.js has an effect. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

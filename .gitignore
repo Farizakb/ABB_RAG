@@ -12,6 +12,9 @@ ABB_DS_SW_CASE_STUDY.docx
 # NOTE: docs/ itself is deliberately NOT ignored. docs/adr/, docs/error-analysis.md
 # and docs/demo-script.md are graded deliverables under SPEC §19 and must ship.
 
+# Subagent-driven-development scratch: ledger, briefs, reports, review packages.
+.superpowers/
+
 # --- Secrets ---
 .env
 .env.*

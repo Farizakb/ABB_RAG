@@ -1,0 +1,35 @@
+name: ci
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_USER: abb, POSTGRES_PASSWORD: abb, POSTGRES_DB: abb }
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://abb:abb@localhost:5432/abb
+      EMBEDDING_DIM: "1536"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -e packages/contracts -e packages/scraper -r requirements-dev.txt -r services/rag/requirements.txt -r services/chat/requirements.txt
+      # mypy in two calls: services/rag/app and services/chat/app are both
+      # top-level package `app`, so one bare `mypy` run hits mypy's
+      # duplicate-module-name error (same reason the pytest step below is
+      # split per project).
+      - run: ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
+      - run: psql "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f db/migrations/001_schema.sql
+      # services/rag/app and services/chat/app are both top-level package `app`,
+      # so a single bare pytest run can't import both. Run per project instead,
+      # and skip any project a later task hasn't created yet rather than going red.
+      - run: |
+          if [ -d packages ]; then pytest packages; fi
+          if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi
+          if [ -d services/chat ]; then PYTHONPATH=packages/contracts pytest services/chat; fi
+          if [ -d evals ]; then PYTHONPATH=services/rag:packages/contracts pytest evals; fi
+      - run: PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden evals/golden.jsonl --limit 10 --mock --out /tmp/report.md
