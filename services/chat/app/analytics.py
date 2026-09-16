@@ -29,11 +29,20 @@ WHERE NOT i.refused AND (s->>'n')::int = c::int
 GROUP BY 1 ORDER BY 2 DESC LIMIT 10
 """
 
+# Task 42, ruling 6: a small-talk row (grounded=false AND refused=false AND
+# error IS NULL -- a friendly, intentionally-ungrounded, non-refused reply)
+# is excluded from the grounded-rate average's denominator via FILTER, not
+# just from its numerator -- an answered-but-never-meant-to-be-grounded row
+# must not dilute the metric at all, and is reported separately as its own
+# count instead.
 TOTALS = """
 SELECT count(*),
        coalesce(percentile_cont(0.5) WITHIN GROUP (ORDER BY latency_ms), 0)::int,
-       coalesce(avg(CASE WHEN grounded THEN 1.0 ELSE 0.0 END), 0)::numeric(4,3),
-       coalesce(sum(cost_usd), 0)
+       coalesce(avg(CASE WHEN grounded THEN 1.0 ELSE 0.0 END)
+                 FILTER (WHERE NOT (NOT refused AND NOT grounded AND error IS NULL)), 0)
+                 ::numeric(4,3),
+       coalesce(sum(cost_usd), 0),
+       count(*) FILTER (WHERE NOT refused AND NOT grounded AND error IS NULL)
 FROM app.interactions WHERE created_at > now() - %s::interval
 """
 
@@ -54,7 +63,7 @@ def summary(window: str = "7d") -> dict[str, Any]:
         top = [{"url": u, "count": c} for u, c in conn.execute(TOP_SOURCES, (interval,)).fetchall()]
         totals_row = conn.execute(TOTALS, (interval,)).fetchone()
         assert totals_row is not None  # count(*) always returns exactly one row
-        n, median, grounded, cost = totals_row
+        n, median, grounded, cost, small_talk = totals_row
 
     # P104: refusal_rate counts all three refusal classes, not just two.
     refused = sum(
@@ -66,6 +75,9 @@ def summary(window: str = "7d") -> dict[str, Any]:
         "volume_by_day": volume,
         "grounded_rate": float(grounded),
         "refusal_rate": round(refused / total, 3) if total else 0.0,
+        # Task 42, ruling 6: small talk's own count, kept out of grounded_rate
+        # and refusal_rate alike (it is neither grounded nor refused).
+        "small_talk_count": small_talk,
         "top_sources": top,
         "totals": {
             "questions": n,

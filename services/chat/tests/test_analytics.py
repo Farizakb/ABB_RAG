@@ -3,6 +3,8 @@
 # services/chat/conftest.py.
 from __future__ import annotations
 
+import json
+import uuid
 from typing import Any
 
 import httpx
@@ -11,6 +13,41 @@ from app.main import app
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
+
+_INSERT_INTERACTION = """
+INSERT INTO app.interactions
+ (id, session_id, corpus_id, question, answer, grounded, refused, refusal_class, error,
+  citations, retrieval, facts_used, model, prompt_version,
+  prompt_tokens, completion_tokens, cost_usd, retrieval_ms, generation_ms, latency_ms)
+VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+"""
+
+
+def _interaction_row(
+    question: str, answer: str, grounded: bool, refused: bool, refusal_class: str | None
+) -> tuple[Any, ...]:
+    return (
+        uuid.uuid4(),
+        "s-small-talk",
+        uuid.uuid4(),
+        question,
+        answer,
+        grounded,
+        refused,
+        refusal_class,
+        None,
+        json.dumps([]),
+        json.dumps([]),
+        json.dumps([]),
+        "gpt-5.6-luna",
+        "answer_v2",
+        10,
+        5,
+        0.001,
+        5,
+        50,
+        55,
+    )
 
 
 def test_summary_returns_every_field_the_three_charts_need(
@@ -146,3 +183,23 @@ def test_write_path_persists_p108_retrieval_shape_and_top_sources_resolves(
     by_url = {s["url"]: s["count"] for s in top}
     assert by_url.get(url_2) == 1
     assert url_1 not in by_url
+
+
+# Task 42, ruling 6: a small-talk row (grounded=false, refused=false, error is
+# null) must not dilute grounded_rate's denominator and must be reported as
+# its own count.
+def test_small_talk_is_excluded_from_grounded_rate_and_counted_on_its_own(db: Any) -> None:
+    rows = [
+        _interaction_row(
+            "Nağd kredit məbləği nə qədərdir?", "Maksimum 20 000 AZN.", True, False, None
+        ),
+        _interaction_row("salam", "Salam! Mən ABB Bank-ın köməkçisiyəm.", False, False, None),
+    ]
+    for row in rows:
+        db.execute(_INSERT_INTERACTION, row)
+
+    body = client.get("/api/v1/analytics/summary?window=7d").json()
+    assert body["small_talk_count"] == 1
+    # Denominator excludes the small-talk row entirely: 1/1 grounded, not 1/2.
+    assert body["totals"]["grounded_rate"] == 1.0
+    assert body["grounded_rate"] == 1.0

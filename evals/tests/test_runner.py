@@ -228,6 +228,57 @@ def test_from_rows_cli_renders_byte_identical_markdown_to_in_memory_rows(
     assert out_path.read_text(encoding="utf-8") == expected
 
 
+# Task 42, ruling 6: small_talk items pass iff refused=false and no sources
+# were carried, and stay out of the grounded/citation/refusal-set metrics
+# purely by virtue of their `type` not being "answerable"/"out_of_scope"/
+# "advisory" (score_item's existing type-scoped logic already handles that).
+def test_small_talk_item_passes_when_answered_with_no_sources() -> None:
+    item = {"id": "st01", "type": "small_talk", "question": "sen kimsen?"}
+    r = score_item(item, sources=[], answer="Salam!", grounded=False, refused=False, facts=[])
+    assert r["small_talk_ok"] is True
+    assert r["wrong_answer"] is False
+    assert r["citation_present"] is None
+    assert r["retrieval_hit"] is None
+
+
+def test_small_talk_item_fails_when_refused() -> None:
+    item = {"id": "st02", "type": "small_talk", "question": "Salam kimsen sen?"}
+    r = score_item(
+        item,
+        sources=[],
+        answer="937...",
+        grounded=False,
+        refused=True,
+        facts=[],
+        refusal_class="out_of_scope",
+    )
+    assert r["small_talk_ok"] is False
+    assert r["wrong_answer"] is True
+
+
+def test_small_talk_item_fails_when_it_carries_sources() -> None:
+    item = {"id": "st03", "type": "small_talk", "question": "necesen?"}
+    r = score_item(
+        item,
+        sources=[src("https://abb-bank.az/x")],
+        answer="Salam!",
+        grounded=False,
+        refused=False,
+        facts=[],
+    )
+    assert r["small_talk_ok"] is False
+    assert r["wrong_answer"] is True
+
+
+def test_small_talk_rows_are_excluded_from_grounded_answerable_metric() -> None:
+    rows = [
+        {"type": "answerable", "grounded": True},
+        {"type": "small_talk", "grounded": False, "small_talk_ok": True, "wrong_answer": False},
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 2})
+    assert "grounded rate, answerable only (n=1) | 1.0" in md
+
+
 def test_a_failed_enumeration_assertion_counts_as_a_wrong_answer() -> None:
     r = score_item(
         ENUM_ITEM,

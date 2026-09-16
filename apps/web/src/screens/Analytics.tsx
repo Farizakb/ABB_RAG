@@ -48,6 +48,9 @@ export function Analytics() {
       {error && <p role="alert">{error}</p>}
       {!summary ? <p className="status">Loading…</p> : <>
       <StatTiles totals={summary.totals} />
+      {/* Task 42: small talk is neither grounded nor refused, so it is called
+          out here rather than silently folded into "Grounded rate" above. */}
+      <p className="meta">{summary.small_talk_count} small-talk replies this window (excluded from grounded rate)</p>
 
       <h2>Questions over time</h2>
       <ResponsiveContainer width="100%" height={220}>

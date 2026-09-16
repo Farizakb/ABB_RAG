@@ -44,6 +44,14 @@ def score_item(
         if item.get("refusal_class"):
             refusal_correct = refused and refusal_class == item["refusal_class"]
 
+    # Task 42, ruling 6: a small_talk item passes iff it was answered (not
+    # refused) and carried no sources -- it is neither grounded nor a
+    # refusal, so it gets its own pass/fail shape instead of borrowing
+    # must_refuse's or an answerable item's.
+    small_talk_ok = True
+    if item.get("type") == "small_talk":
+        small_talk_ok = (not refused) and not urls
+
     include_ok = all(s in answer for s in item.get("must_include_facts", []))
     exclude_ok = all(s not in answer for s in item.get("must_not_include", []))
 
@@ -76,7 +84,11 @@ def score_item(
             )
 
     wrong = (
-        (must_refuse and not refused) or not exclude_ok or not numeric_ok or enumeration_ok is False
+        (must_refuse and not refused)
+        or not exclude_ok
+        or not numeric_ok
+        or enumeration_ok is False
+        or not small_talk_ok
     )
 
     timings = timings or {}
@@ -90,6 +102,7 @@ def score_item(
         "exclude_ok": exclude_ok,
         "numeric_ok": numeric_ok,
         "enumeration_ok": enumeration_ok,
+        "small_talk_ok": small_talk_ok if item.get("type") == "small_talk" else None,
         "wrong_answer": wrong,
         "grounded": grounded,
         "retrieval_ms": timings.get("retrieval_ms"),
@@ -218,6 +231,7 @@ class Report:
             f"| must_not_include | {self._rate('exclude_ok')} |",
             f"| numeric agreement | {self._rate('numeric_ok')} |",
             f"| enumeration | {self._rate('enumeration_ok')} |",
+            f"| small talk correct | {self._rate('small_talk_ok')} |",
             f"| grounded rate, answerable only (n={len(answerable)}) | {grounded_answerable} |",
             "",
             "## Latency (ms)",
@@ -267,6 +281,7 @@ class Report:
             "exclude_ok",
             "numeric_ok",
             "enumeration_ok",
+            "small_talk_ok",
         )
         lines += [
             f"- `{r['id']}` ({r['type']}): " + ", ".join(k for k in checks if r.get(k) is False)

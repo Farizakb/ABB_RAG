@@ -7,7 +7,7 @@ from __future__ import annotations
 import pathlib
 import re
 import time
-from typing import Protocol
+from typing import Literal, Protocol
 
 from contracts.models import AnswerResponse, RefusalClass, Source
 from openai import OpenAI
@@ -17,7 +17,7 @@ from app.config import settings
 from app.embedder import Embedder
 from app.retrieval import retrieve
 
-PROMPT_VERSION = "answer_v1"
+PROMPT_VERSION = "answer_v2"
 SYSTEM = (pathlib.Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md").read_text("utf-8")
 URL_IN_TEXT = re.compile(r"\S*(?:https?://|www\.|abb-bank\.az)\S*")
 
@@ -36,6 +36,10 @@ class ModelOutput(BaseModel):
     answer: str
     citations: list[int]
     grounded: bool
+    # Task 42: defaults to "bank_question" so a payload from before this field
+    # existed (every FakeClient fixture pinned in tests written pre-v2) still
+    # parses and takes the original cited-or-refused path unchanged.
+    intent: Literal["bank_question", "small_talk"] = "bank_question"
 
 
 class Completion(Protocol):
@@ -77,11 +81,15 @@ class OpenAIClient:
                     "schema": {
                         "type": "object",
                         "additionalProperties": False,
-                        "required": ["answer", "citations", "grounded"],
+                        "required": ["answer", "citations", "grounded", "intent"],
                         "properties": {
                             "answer": {"type": "string"},
                             "citations": {"type": "array", "items": {"type": "integer"}},
                             "grounded": {"type": "boolean"},
+                            "intent": {
+                                "type": "string",
+                                "enum": ["bank_question", "small_talk"],
+                            },
                         },
                     },
                 }
@@ -143,8 +151,15 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
     `client.complete(...)` calls below are then plain attribute access, no
     `# type: ignore[attr-defined]` needed.
 
-    Invariant (SPEC §7.4): every return is either grounded with >=1 resolved
-    citation, or `_refuse(...)` -- there is no third state.
+    Invariant (SPEC §7.4, revised by Task 42): every return is grounded with
+    >=1 resolved citation, `_refuse(...)`, or exactly one further legal
+    state -- `out.intent == "small_talk"` (a greeting, an identity question,
+    thanks, goodbye; never a bank fact): `grounded=false, refused=false,
+    refusal_class=null, sources=[]`. There is no fourth state. A small_talk
+    answer that leaks a digit, `%`, `AZN`/`₼`, or a URL is not trusted as
+    small talk -- it is routed through `_refuse(...)` exactly like a failed
+    grounding check, because a real bank fact was smuggled past the intent
+    gate.
     """
     r = retrieve(corpus_id, question, embedder)
     timings = {"retrieval_ms": r.took_ms}
@@ -175,6 +190,27 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
             timings["generation_ms"] = int((time.perf_counter() - started) * 1000)
             return _refuse(r.sources, "out_of_scope", r.candidates, timings, usage)
     timings["generation_ms"] = int((time.perf_counter() - started) * 1000)
+
+    if out.intent == "small_talk":
+        if _leaks_bank_content(out.answer):
+            # Ruling 4: a small_talk label the model attached to an answer
+            # that still carries a fact must not dodge the cite-or-refuse
+            # gate -- treat it exactly like a failed grounding check.
+            klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
+            return _refuse(r.sources, klass, r.candidates, timings, usage)
+        clean = URL_IN_TEXT.sub("", out.answer).replace("  ", " ").strip()
+        return AnswerResponse(
+            answer=clean,
+            citations=[],
+            sources=[],
+            grounded=False,
+            refused=False,
+            refusal_class=None,
+            usage=usage,
+            retrieval=r.candidates,
+            timings_ms=timings,
+            prompt_version=PROMPT_VERSION,
+        )
 
     valid = {s.n for s in r.sources}
     citations = [c for c in out.citations if c in valid]
@@ -224,3 +260,20 @@ def _looks_advisory(question: str) -> bool:
     drawn in the system prompt (rule 6); this only picks which message to show."""
     q = question.lower()
     return any(h in q for h in ADVISORY_HINTS)
+
+
+_CURRENCY_HINTS = ("azn", "₼")
+
+
+def _leaks_bank_content(answer: str) -> bool:
+    """Ruling 4's grounding-escape guard: a `small_talk`-labelled answer must
+    carry nothing that looks like a published bank fact -- a digit, a `%`
+    sign, an AZN/₼ currency mark, or a URL -- or a model could dodge the
+    cite-or-refuse gate by mislabelling a real banking answer as small talk."""
+    lowered = answer.lower()
+    return (
+        any(ch.isdigit() for ch in answer)
+        or "%" in answer
+        or any(hint in lowered for hint in _CURRENCY_HINTS)
+        or bool(URL_IN_TEXT.search(answer))
+    )
