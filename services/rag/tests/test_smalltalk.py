@@ -206,3 +206,18 @@ def test_bank_question_intent_is_unaffected_by_the_new_field(seeded_corpus: str,
     assert r.grounded is True
     assert r.refused is False
     assert r.citations == [1]
+
+
+def test_claim_lexicon_matches_whole_english_words_and_az_ru_stems() -> None:
+    """English entries are whole-word ("rate" must not fire on "generate",
+    "fee" on "coffee"); az/ru entries are stems that keep their suffixes."""
+    from app.generate import _CLAIM_PATTERN
+
+    for benign in (
+        "I can help you with separate questions about cards.",
+        "Happy to chat over a coffee-length question!",
+        "I find banking topics interesting.",
+    ):
+        assert not _CLAIM_PATTERN.search(benign), benign
+    for claim in ("The card is free.", "No fees apply.", "Kart pulsuzdur.", "Ставки низкие."):
+        assert _CLAIM_PATTERN.search(claim), claim

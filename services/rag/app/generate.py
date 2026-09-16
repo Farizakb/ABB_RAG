@@ -1,6 +1,6 @@
 # services/rag/app/generate.py
 # ruff: noqa: RUF001, RUF003 -- genuine Azerbaijani copy (REFUSAL_AZ,
-# ADVISORY_AZ, ADVISORY_HINTS, _CLAIM_LEXICON and the comments naming its
+# ADVISORY_AZ, ADVISORY_HINTS, _CLAIM_STEMS and the comments naming its
 # "haqqı" entry) contains dotless-i and friends; same convention as
 # services/rag/conftest.py and services/rag/tests/test_chunking.py.
 from __future__ import annotations
@@ -274,10 +274,12 @@ _CURRENCY_HINTS = ("azn", "₼")
 # Fix round 1, F1: a lexical guard cannot be perfect -- "ABB-nin illik haqqı
 # yoxdur" or "kart pulsuzdur" carry a real claim with no digit, %, currency
 # mark, or URL in sight. These are price/condition words in az (incl. a few
-# common transliterations without diacritics), en and ru, matched as plain
-# substrings (not whole-word) because Azerbaijani suffixes attach directly to
-# the stem -- "pulsuzdur" ("[it] is free") must still hit "pulsuz".
-_CLAIM_LEXICON = (
+# common transliterations without diacritics), en and ru. az and ru stems are
+# matched from a word start with any suffix allowed, because suffixes attach
+# directly to the stem -- "pulsuzdur" ("[it] is free") must still hit "pulsuz",
+# "ставки" must hit "ставк". English words are matched whole-word, so "rate"
+# does not fire on "generate"/"separate", nor "fee" on "coffee".
+_CLAIM_STEMS = (
     "pulsuz",
     "ödənişsiz",
     "komissiya",
@@ -288,23 +290,26 @@ _CLAIM_LEXICON = (
     "şərt",
     "limit",
     "cashback",
-    "free",
-    "fee",
-    "rate",
-    "interest",
-    "commission",
-    "бесплатно",
-    "комиссия",
+    "бесплатн",
+    "комисси",
     "процент",
-    "ставка",
+    "ставк",
 )
+_CLAIM_WORDS_EN = ("free", "fees?", "rates?", "interest", "commissions?")
 # "haqqı" ("fee"/"due") is the one entry that needs whole-word care: a plain
 # substring match would also fire on "haqqında" ("about" -- an unrelated
 # postposition that happens to start with the same five letters), so it gets
 # its own alternative with a negative lookahead instead of joining the
 # substring list above.
 _CLAIM_PATTERN = re.compile(
-    r"haqqı(?!nda)|" + "|".join(re.escape(w) for w in _CLAIM_LEXICON), re.IGNORECASE
+    r"\bhaqqı(?!nda)"
+    + r"|\b(?:"
+    + "|".join(re.escape(w) for w in _CLAIM_STEMS)
+    + ")"
+    + r"|\b(?:"
+    + "|".join(_CLAIM_WORDS_EN)
+    + r")\b",
+    re.IGNORECASE,
 )
 # A genuine small-talk reply is short (prompt rule 2 caps it at 3 sentences).
 # A long one is exactly where a claim the lexicon doesn't know about is most
