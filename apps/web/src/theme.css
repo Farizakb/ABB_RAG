@@ -45,7 +45,11 @@ p { margin: 0 0 var(--space-3); line-height: 1.5; }
 
 /* Page shell rhythm -- the only <nav>/<main> in the app, so plain
    elements are safe, stable selectors. */
-main { padding: var(--space-4); }
+/* Left-aligned, not centred (§11.4), so no auto margins. The cap keeps
+   Analytics' tables readable on a wide monitor without reintroducing the
+   68ch page-wide measure that was squeezing the ledger rail and wrapping
+   the stat tiles onto a second row. */
+main { padding: var(--space-4); max-width: 72rem; }
 nav { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
 
 /* Nav reads as tabs. aria-current="page" already marks the active one;
@@ -146,12 +150,19 @@ aside[aria-label="Sources"] td:nth-child(3) { width: 3.5rem; }
 @keyframes ledger-resolve { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 aside[aria-label="Sources"] { animation: ledger-resolve 280ms ease-out; }
 
-/* Responsive floor: 380px. The Chat screen's asymmetric grid is declared
-   inline (Chat.tsx) so it can carry the exact SPEC column template;
-   overriding it to stack at narrow widths needs !important because an
-   external stylesheet cannot otherwise beat an inline style. */
+/* Chat's asymmetric two-column layout (§11.4): conversation at the 68ch
+   measure, source ledger as a 22rem right rail. Declared here rather than
+   inline in Chat.tsx so the narrow-width override below wins on the plain
+   cascade instead of needing !important to beat an inline style. */
+.chat-grid {
+  display: grid;
+  grid-template-columns: minmax(0, var(--measure)) 22rem;
+  gap: var(--space-5);
+}
+
+/* Responsive floor: 380px. */
 @media (max-width: 640px) {
-  .chat-grid { grid-template-columns: 1fr !important; }
+  .chat-grid { grid-template-columns: 1fr; }
   aside[aria-label="Sources"] { border-left: none; padding-left: 0; border-top: 1px solid var(--rule); padding-top: var(--space-3); }
   /* The four fixed widths above (11 + 9 + 5rem) add up to more than a
      380px viewport has to give, which was starving the Question column

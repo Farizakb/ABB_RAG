@@ -132,9 +132,16 @@ class Report:
         return 1 if any(r.get("wrong_answer") for r in self.rows) else 0
 
     def markdown(self, config: dict[str, Any]) -> str:
-        sha = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
-        ).stdout.strip()
+        try:
+            sha = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"], capture_output=True, text=True
+            ).stdout.strip()
+        except FileNotFoundError:
+            # No git binary on PATH -- the runtime images ship without one, and
+            # the runner is executed inside `rag` when the host cannot reach the
+            # pool. The sha is provenance, not a metric: losing it beats losing a
+            # completed run's report to an exception raised after every paid call.
+            sha = ""
         wrong = [r for r in self.rows if r.get("wrong_answer")]
         lines = [
             "# Eval report",

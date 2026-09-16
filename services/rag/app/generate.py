@@ -49,6 +49,12 @@ class Completion(Protocol):
 class OpenAIClient:
     def __init__(self) -> None:
         self._c = OpenAI(api_key=settings.openai_api_key)
+        # The eval runner stamps the report's config line with
+        # `getattr(client, "model", "mock")`. Without this attribute a real,
+        # paid run reports itself as `"model": "mock"` -- which reads to a
+        # reviewer as fabricated numbers. The generation model belongs in the
+        # report beside the embedding model either way.
+        self.model = settings.llm_model
 
     def complete(self, prompt: str) -> tuple[str, dict[str, int]]:
         # No `temperature`: the configured model rejects it outright --

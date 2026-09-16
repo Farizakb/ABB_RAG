@@ -22,7 +22,10 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <main className="max-w-measure">
+      {/* SPEC §11.4 scopes the 68ch measure to the conversation column, not to
+          the page: Data sets it on its own section, Chat carries it in the grid
+          template, and Analytics is table-first and needs the full width. */}
+      <main>
         <h1>ABB Assistant</h1>
         <nav>
           <button onClick={() => setTab("data")} aria-current={tab === "data" ? "page" : undefined}>

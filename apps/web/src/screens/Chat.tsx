@@ -40,7 +40,7 @@ export function Chat({ corpusId }: { corpusId: string }) {
   }
 
   return (
-    <div className="chat-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, var(--measure)) 22rem", gap: "2rem" }}>
+    <div className="chat-grid">
       <section>
         <form onSubmit={submit}>
           <label htmlFor="q">Ask about ABB</label>
