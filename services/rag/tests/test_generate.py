@@ -123,6 +123,10 @@ def test_the_prompt_forbids_claiming_a_list_is_latest_or_ordered(
     prompt = client.last_prompt.lower()
     assert "never describe a list as the latest" in prompt
     assert "do not number list items" in prompt
+    # P119: forbidding the *claim* was not enough -- the model kept the recency
+    # words in a closing disclaimer ("Ən son kampaniyalar üçün ..."), which the
+    # eval reads as a recency claim. The phrase itself is banned, not just the claim.
+    assert 'never write "ən son"' in prompt
 
 
 def test_build_prompt_numbers_and_orders_sources_matching_their_n() -> None:
