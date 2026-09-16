@@ -1,7 +1,10 @@
-.PHONY: scrape up down ingest demo eval test lint fresh
+.PHONY: scrape up down ingest demo eval test lint fresh db-ui
 scrape:  ; docker compose --profile scraper run --rm scraper --max-pages 400
 up:      ; docker compose up -d --build
 down:    ; docker compose down
+# Walkthrough tool only: loopback-bound (127.0.0.1:8081), profile-gated so it
+# never starts with `up`/`demo`, and never part of the deployed stack.
+db-ui:   ; docker compose --profile tools up -d adminer
 ingest:  ; python scripts/ingest_fixture.py fixtures/corpus_sample.json
 demo:
 	$(MAKE) up

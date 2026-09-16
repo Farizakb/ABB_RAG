@@ -19,7 +19,31 @@ from app.db import get_conn
 from app.redaction import redact
 
 router = APIRouter(prefix="/api/v1")
-limiter = Limiter(key_func=get_remote_address)
+
+
+def _client_key(request: Request) -> str:
+    """Rate-limit key: the *original* client, not nginx's own address.
+
+    Every request reaches `chat` through our own nginx (apps/web/nginx.conf),
+    which sets `X-Forwarded-For: $proxy_add_x_forwarded_for` on both proxied
+    locations. Taking the first entry (the client; anything after it is our
+    own proxy hop) is safe -- not merely convenient -- only because of the
+    topology: `chat` publishes no port (see docker-compose.yml), so no client
+    can reach it directly and forge this header themselves. A reviewer who
+    knows X-Forwarded-For is spoofable in general should ask about that; the
+    answer is that there is exactly one path in, and nginx owns the header on
+    that path.
+
+    Falls back to `get_remote_address` when the header is absent, so local
+    direct calls (health checks, the test suite) still work.
+    """
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_client_key)
 
 INSERT = """
 INSERT INTO app.interactions
