@@ -5,6 +5,7 @@ fresh-clone test, and by CI."""
 from __future__ import annotations
 
 import json
+import os
 import pathlib
 import sys
 import time
@@ -12,7 +13,7 @@ from typing import Any
 
 import httpx
 
-RAG = "http://localhost:8080"
+RAG = os.environ.get("RAG_BASE_URL", "http://localhost:8080")
 
 
 def main() -> int:
