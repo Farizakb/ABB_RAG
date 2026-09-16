@@ -18,26 +18,35 @@ const INK = "#16202B", ACCENT = "#0B5FA5", OK = "#1F7A5C", FLAG = "#A23B2E", RUL
 export function Analytics() {
   const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
   const [rows, setRows] = useState<InteractionRow[]>([]);
+  const [total, setTotal] = useState(0);
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.analytics("7d").then(setSummary).catch((e) => {
+    api.analytics("7d").then((s) => { setSummary(s); setError(""); }).catch((e) => {
       setError(e instanceof Error ? e.message : "Failed to load analytics summary.");
     });
   }, []);
 
   useEffect(() => {
-    api.interactions(q).then((r) => setRows(r.items)).catch((e) => {
+    // 200 is the server's own ceiling (services/chat/app/routes.py clamps
+    // limit into [1, 200]) -- the highest count "Every question asked" can
+    // honestly promise without a second page.
+    api.interactions(q, 200).then((r) => {
+      setRows(r.items);
+      setTotal(r.total);
+      setError("");
+    }).catch((e) => {
       setError(e instanceof Error ? e.message : "Failed to load interactions.");
     });
   }, [q]);
 
-  if (error) return <p role="alert" style={{ color: "var(--flag)" }}>{error}</p>;
-  if (!summary) return <p>Loading…</p>;
-
+  // Alert renders above content rather than replacing it, so a transient
+  // failure (e.g. a search keystroke) doesn't blank panels already loaded.
   return (
     <section>
+      {error && <p role="alert" style={{ color: "var(--flag)" }}>{error}</p>}
+      {!summary ? <p>Loading…</p> : <>
       <StatTiles totals={summary.totals} />
 
       <h2>Questions over time</h2>
@@ -81,6 +90,7 @@ export function Analytics() {
       </table>
 
       <h2>Every question asked</h2>
+      <p className="num" style={{ color: "var(--rule)" }}>{rows.length} of {total}</p>
       <input aria-label="Search questions" value={q} onChange={(e) => setQ(e.target.value)}
              placeholder="Search" />
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -101,6 +111,7 @@ export function Analytics() {
           ))}
         </tbody>
       </table>
+      </>}
     </section>
   );
 }
