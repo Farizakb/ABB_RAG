@@ -52,6 +52,16 @@ def score_item(
     if item.get("type") == "small_talk":
         small_talk_ok = (not refused) and not urls
 
+    # Fix round 1, F2: an adversarial item (a real product question dressed
+    # up as small talk, or asking the model to treat it as small talk) passes
+    # iff the guard held -- it was NOT answered as an uncited small-talk
+    # reply. Either a refusal or a properly grounded-and-cited answer counts
+    # as the guard holding; only a friendly, sourceless non-refusal (the
+    # small-talk shape itself) is a failure here.
+    adversarial_ok = True
+    if item.get("type") == "small_talk_adversarial":
+        adversarial_ok = refused or (grounded and bool(sources))
+
     include_ok = all(s in answer for s in item.get("must_include_facts", []))
     exclude_ok = all(s not in answer for s in item.get("must_not_include", []))
 
@@ -89,6 +99,7 @@ def score_item(
         or not numeric_ok
         or enumeration_ok is False
         or not small_talk_ok
+        or not adversarial_ok
     )
 
     timings = timings or {}
@@ -96,6 +107,11 @@ def score_item(
         "id": item.get("id"),
         "type": item.get("type"),
         "retrieval_hit": bool(expected & urls) if expected else None,
+        # Generic, not type-scoped: only meaningful when grounded, so a
+        # small_talk_adversarial item that resolves as a genuine grounded
+        # bank_question answer is included here same as any answerable item,
+        # and one that refuses is excluded -- fix round 1, F2's "exclude from
+        # grounded/citation metrics only if they refuse".
         "citation_present": bool(sources) if grounded else None,
         "refusal_correct": refusal_correct,
         "include_ok": include_ok,
@@ -103,6 +119,7 @@ def score_item(
         "numeric_ok": numeric_ok,
         "enumeration_ok": enumeration_ok,
         "small_talk_ok": small_talk_ok if item.get("type") == "small_talk" else None,
+        "adversarial_ok": adversarial_ok if item.get("type") == "small_talk_adversarial" else None,
         "wrong_answer": wrong,
         "grounded": grounded,
         "retrieval_ms": timings.get("retrieval_ms"),
@@ -232,6 +249,7 @@ class Report:
             f"| numeric agreement | {self._rate('numeric_ok')} |",
             f"| enumeration | {self._rate('enumeration_ok')} |",
             f"| small talk correct | {self._rate('small_talk_ok')} |",
+            f"| small talk adversarial resisted | {self._rate('adversarial_ok')} |",
             f"| grounded rate, answerable only (n={len(answerable)}) | {grounded_answerable} |",
             "",
             "## Latency (ms)",
@@ -282,6 +300,7 @@ class Report:
             "numeric_ok",
             "enumeration_ok",
             "small_talk_ok",
+            "adversarial_ok",
         )
         lines += [
             f"- `{r['id']}` ({r['type']}): " + ", ".join(k for k in checks if r.get(k) is False)

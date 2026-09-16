@@ -1,6 +1,7 @@
 # services/rag/app/generate.py
-# ruff: noqa: RUF001 -- genuine Azerbaijani copy (REFUSAL_AZ, ADVISORY_AZ,
-# ADVISORY_HINTS) contains dotless-i and friends; same convention as
+# ruff: noqa: RUF001, RUF003 -- genuine Azerbaijani copy (REFUSAL_AZ,
+# ADVISORY_AZ, ADVISORY_HINTS, _CLAIM_LEXICON and the comments naming its
+# "haqqı" entry) contains dotless-i and friends; same convention as
 # services/rag/conftest.py and services/rag/tests/test_chunking.py.
 from __future__ import annotations
 
@@ -156,10 +157,16 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
     state -- `out.intent == "small_talk"` (a greeting, an identity question,
     thanks, goodbye; never a bank fact): `grounded=false, refused=false,
     refusal_class=null, sources=[]`. There is no fourth state. A small_talk
-    answer that leaks a digit, `%`, `AZN`/`₼`, or a URL is not trusted as
-    small talk -- it is routed through `_refuse(...)` exactly like a failed
-    grounding check, because a real bank fact was smuggled past the intent
-    gate.
+    answer is trusted only if `_leaks_bank_content` finds nothing -- a digit,
+    `%`, `AZN`/`₼`, a URL, a price/condition word from a small multilingual
+    lexicon, or an over-length reply -- otherwise it is routed through
+    `_refuse(...)` exactly like a failed grounding check, because a real bank
+    fact (or an instruction to relabel one as small talk, fix round 1's F1)
+    was smuggled past the intent gate. Residual risk, stated honestly: a
+    lexicon is never exhaustive, so a fact phrased with none of its words can
+    still slip through. This is one layer among four (prompt rule 2, the
+    400-char cap, this lexicon, and `evals/golden.jsonl`'s
+    `small_talk_adversarial` rows), not a proof of unreachability.
     """
     r = retrieve(corpus_id, question, embedder)
     timings = {"retrieval_ms": r.took_ms}
@@ -264,16 +271,60 @@ def _looks_advisory(question: str) -> bool:
 
 _CURRENCY_HINTS = ("azn", "₼")
 
+# Fix round 1, F1: a lexical guard cannot be perfect -- "ABB-nin illik haqqı
+# yoxdur" or "kart pulsuzdur" carry a real claim with no digit, %, currency
+# mark, or URL in sight. These are price/condition words in az (incl. a few
+# common transliterations without diacritics), en and ru, matched as plain
+# substrings (not whole-word) because Azerbaijani suffixes attach directly to
+# the stem -- "pulsuzdur" ("[it] is free") must still hit "pulsuz".
+_CLAIM_LEXICON = (
+    "pulsuz",
+    "ödənişsiz",
+    "komissiya",
+    "faiz",
+    "dərəcə",
+    "derece",
+    "müddət",
+    "şərt",
+    "limit",
+    "cashback",
+    "free",
+    "fee",
+    "rate",
+    "interest",
+    "commission",
+    "бесплатно",
+    "комиссия",
+    "процент",
+    "ставка",
+)
+# "haqqı" ("fee"/"due") is the one entry that needs whole-word care: a plain
+# substring match would also fire on "haqqında" ("about" -- an unrelated
+# postposition that happens to start with the same five letters), so it gets
+# its own alternative with a negative lookahead instead of joining the
+# substring list above.
+_CLAIM_PATTERN = re.compile(
+    r"haqqı(?!nda)|" + "|".join(re.escape(w) for w in _CLAIM_LEXICON), re.IGNORECASE
+)
+# A genuine small-talk reply is short (prompt rule 2 caps it at 3 sentences).
+# A long one is exactly where a claim the lexicon doesn't know about is most
+# likely to hide, so length alone is its own signal.
+_SMALL_TALK_MAX_CHARS = 400
+
 
 def _leaks_bank_content(answer: str) -> bool:
-    """Ruling 4's grounding-escape guard: a `small_talk`-labelled answer must
-    carry nothing that looks like a published bank fact -- a digit, a `%`
-    sign, an AZN/₼ currency mark, or a URL -- or a model could dodge the
-    cite-or-refuse gate by mislabelling a real banking answer as small talk."""
+    """Ruling 4's grounding-escape guard, hardened by fix round 1 (F1): a
+    `small_talk`-labelled answer must carry nothing that looks like a
+    published bank fact -- a digit, a `%` sign, an AZN/₼ currency mark, a URL,
+    a price/condition word from `_CLAIM_PATTERN`, or a reply over
+    `_SMALL_TALK_MAX_CHARS` -- or a model could dodge the cite-or-refuse gate
+    by mislabelling a real banking answer as small talk (or being told to)."""
     lowered = answer.lower()
     return (
-        any(ch.isdigit() for ch in answer)
+        len(answer) > _SMALL_TALK_MAX_CHARS
+        or any(ch.isdigit() for ch in answer)
         or "%" in answer
         or any(hint in lowered for hint in _CURRENCY_HINTS)
         or bool(URL_IN_TEXT.search(answer))
+        or bool(_CLAIM_PATTERN.search(answer))
     )

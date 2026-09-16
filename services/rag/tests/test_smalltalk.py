@@ -1,9 +1,11 @@
 # services/rag/tests/test_smalltalk.py
-# ruff: noqa: RUF001 -- genuine Azerbaijani query/answer text, same convention
-# as services/rag/conftest.py and services/rag/tests/test_refusal.py.
+# ruff: noqa: RUF001, RUF002 -- genuine Azerbaijani query/answer text (incl.
+# in docstrings quoting that text), same convention as services/rag/conftest.py
+# and services/rag/tests/test_refusal.py.
 """Task 42: greetings and identity questions get a friendly reply, not the
 937 refusal boilerplate. See .superpowers/sdd/2026-09-12-abb-assistant/
-task-42-brief.md rulings 1-4."""
+task-42-brief.md rulings 1-4, hardened by
+.superpowers/sdd/2026-09-12-abb-assistant/task-42-fix1.md F1/F2."""
 
 from __future__ import annotations
 
@@ -74,6 +76,119 @@ def test_small_talk_that_leaks_a_url_falls_back_to_refusal(seeded_corpus: str, d
     )
     r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
     assert r.refused is True
+
+
+def test_small_talk_naming_categories_still_passes(seeded_corpus: str, db: Any) -> None:
+    """Fix round 1, F1: naming what it can help with is not itself a claim."""
+    payload = json.dumps(
+        {
+            "answer": "Kartlar, kreditlər və depozitlər haqqında suallarınıza kömək edə bilərəm.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is False
+    assert r.grounded is False
+
+
+def test_small_talk_stating_a_fee_condition_falls_back_to_refusal(
+    seeded_corpus: str, db: Any
+) -> None:
+    """Fix round 1, F1: "Kartın illik haqqı yoxdur" has no digit, %, currency
+    mark, or URL -- only the lexicon guard catches it."""
+    payload = json.dumps(
+        {
+            "answer": "Kartın illik haqqı yoxdur.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is True
+
+
+def test_small_talk_stating_a_price_claim_falls_back_to_refusal(
+    seeded_corpus: str, db: Any
+) -> None:
+    """Fix round 1, F1/F2: "kart pulsuzdur" ("the card is free") -- an
+    Azerbaijani suffix attached directly to the stem, so the guard must match
+    "pulsuz" as a substring, not a whole word."""
+    payload = json.dumps(
+        {
+            "answer": "Kart pulsuzdur.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is True
+
+
+def test_small_talk_english_price_claim_falls_back_to_refusal(seeded_corpus: str, db: Any) -> None:
+    payload = json.dumps(
+        {
+            "answer": "Yes, the card is free.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is True
+
+
+def test_small_talk_over_400_characters_falls_back_to_refusal(seeded_corpus: str, db: Any) -> None:
+    """Fix round 1, F1: a real small-talk reply is short (prompt rule 2 caps
+    it at 3 sentences); an over-length one is where an unlisted claim is most
+    likely hiding, so length alone is its own signal -- no claim word needed
+    to trigger this test."""
+    payload = json.dumps(
+        {
+            "answer": "Salam. " * 80,  # far over 400 chars, no lexicon word at all
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is True
+
+
+def test_small_talk_labelled_reply_confirming_a_free_card_is_refused(
+    seeded_corpus: str, db: Any
+) -> None:
+    """Fix round 1, F2: the exact case named in the fix brief -- an
+    LLM-labelled small_talk reply that answers a disguised bank question."""
+    payload = json.dumps(
+        {
+            "answer": "Bəli, kart pulsuzdur.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is True
+
+
+def test_haqqinda_is_not_mistaken_for_the_haqqi_fee_claim(seeded_corpus: str, db: Any) -> None:
+    """The guard's "haqqı" alternative must not fire on "haqqında" ("about"),
+    an unrelated postposition that happens to start with the same letters --
+    otherwise nearly every small-talk reply naming a topic would false-refuse."""
+    payload = json.dumps(
+        {
+            "answer": "ABB-nin kartları haqqında ümumi məlumat verə bilərəm.",
+            "citations": [],
+            "grounded": False,
+            "intent": "small_talk",
+        }
+    )
+    r = answer(seeded_corpus, "kredit", FakeEmbedder(dim=8), FakeClient(payload))
+    assert r.refused is False
 
 
 def test_bank_question_intent_is_unaffected_by_the_new_field(seeded_corpus: str, db: Any) -> None:

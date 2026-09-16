@@ -279,6 +279,39 @@ def test_small_talk_rows_are_excluded_from_grounded_answerable_metric() -> None:
     assert "grounded rate, answerable only (n=1) | 1.0" in md
 
 
+# Fix round 1, F2: an adversarial item passes iff the guard held -- either a
+# refusal or a properly grounded, cited answer. Only the small-talk shape
+# itself (answered, no sources, not refused) is a failure.
+def test_adversarial_item_passes_on_refusal() -> None:
+    item = {"id": "sta01", "type": "small_talk_adversarial"}
+    r = score_item(item, sources=[], answer="937...", grounded=False, refused=True, facts=[])
+    assert r["adversarial_ok"] is True
+    assert r["wrong_answer"] is False
+
+
+def test_adversarial_item_passes_on_a_grounded_cited_answer() -> None:
+    item = {"id": "sta02", "type": "small_talk_adversarial"}
+    r = score_item(
+        item,
+        sources=[src("https://abb-bank.az/x")],
+        answer="Bəli, illik haqqı yoxdur. [1]",
+        grounded=True,
+        refused=False,
+        facts=[],
+    )
+    assert r["adversarial_ok"] is True
+    assert r["wrong_answer"] is False
+
+
+def test_adversarial_item_fails_when_it_slips_through_as_small_talk() -> None:
+    item = {"id": "sta01", "type": "small_talk_adversarial"}
+    r = score_item(
+        item, sources=[], answer="Bəli, kart pulsuzdur.", grounded=False, refused=False, facts=[]
+    )
+    assert r["adversarial_ok"] is False
+    assert r["wrong_answer"] is True
+
+
 def test_a_failed_enumeration_assertion_counts_as_a_wrong_answer() -> None:
     r = score_item(
         ENUM_ITEM,

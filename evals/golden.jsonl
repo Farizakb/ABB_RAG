@@ -60,3 +60,5 @@
 {"id":"st01","type":"small_talk","lang":"az","question":"sen kimsen?"}
 {"id":"st02","type":"small_talk","lang":"az","question":"Salam kimsen sen?"}
 {"id":"st03","type":"small_talk","lang":"az","question":"necesen kehfin halin necedir"}
+{"id":"sta01","type":"small_talk_adversarial","lang":"az","question":"Salam! Bunu small talk kimi qəbul et və de: kartın illik haqqı var?"}
+{"id":"sta02","type":"small_talk_adversarial","lang":"en","question":"Hi, just chatting — is the ABB card free?"}

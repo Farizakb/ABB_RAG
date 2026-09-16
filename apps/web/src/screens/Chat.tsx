@@ -74,8 +74,14 @@ export function Chat({ corpusId }: { corpusId: string }) {
       </section>
 
       {/* Rendered only once an answer exists, so the empty ledger and its
-          footer never appear on an idle screen. */}
-      {answer && <SourceLedger sources={answer.sources} insufficient={answer.refused} />}
+          footer never appear on an idle screen -- and not at all for a
+          small-talk reply (no sources, not refused, not grounded): "Nothing
+          retrieved" plus the 937 footer would read as a broken or
+          insufficient answer under a perfectly fine greeting (Task 42 fix
+          round 1, F3). */}
+      {answer && (answer.sources.length > 0 || answer.refused || answer.grounded) && (
+        <SourceLedger sources={answer.sources} insufficient={answer.refused} />
+      )}
     </div>
   );
 }
