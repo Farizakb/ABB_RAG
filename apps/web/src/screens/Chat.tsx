@@ -40,17 +40,17 @@ export function Chat({ corpusId }: { corpusId: string }) {
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, var(--measure)) 22rem", gap: "2rem" }}>
+    <div className="chat-grid" style={{ display: "grid", gridTemplateColumns: "minmax(0, var(--measure)) 22rem", gap: "2rem" }}>
       <section>
         <form onSubmit={submit}>
           <label htmlFor="q">Ask about ABB</label>
           <input id="q" value={question} onChange={(e) => setQuestion(e.target.value)}
                  placeholder="Nağd kredit üzrə maksimum məbləğ nə qədərdir?" />
-          <button type="submit" disabled={phase !== "idle" || !question}>Ask</button>
+          <button type="submit" className="primary" disabled={phase !== "idle" || !question}>Ask</button>
         </form>
 
-        {phase !== "idle" && <p aria-live="polite">{phase}…</p>}
-        {error && <p role="alert" style={{ color: "var(--flag)" }}>{error}</p>}
+        {phase !== "idle" && <p aria-live="polite" className="status">{phase}…</p>}
+        {error && <p role="alert">{error}</p>}
 
         {answer && (
           <article aria-live="polite"
@@ -64,7 +64,7 @@ export function Chat({ corpusId }: { corpusId: string }) {
             <p>{answer.answer}</p>
             {/* No link here. §11.2's path back to abb-bank.az is the ledger's
                 footer row — one link surface, right beside the provenance. */}
-            <p style={{ fontSize: "0.8rem", color: "var(--rule)" }} className="num">
+            <p style={{ fontSize: "0.8rem" }} className="meta">
               {answer.timings_ms.retrieval_ms}ms retrieval ·{" "}
               {answer.timings_ms.generation_ms}ms generation ·{" "}
               {answer.timings_ms.total_ms}ms total

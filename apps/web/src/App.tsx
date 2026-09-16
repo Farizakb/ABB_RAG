@@ -22,9 +22,9 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      <main className="max-w-measure" style={{ padding: "1.5rem" }}>
+      <main className="max-w-measure">
         <h1>ABB Assistant</h1>
-        <nav style={{ display: "flex", gap: "1rem", marginBottom: "1rem" }}>
+        <nav>
           <button onClick={() => setTab("data")} aria-current={tab === "data" ? "page" : undefined}>
             Data
           </button>

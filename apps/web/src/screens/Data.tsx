@@ -61,7 +61,7 @@ export function Data({ onReady }: { onReady: (id: string) => void }) {
       <input type="file" accept="application/json" aria-label="Corpus file"
              onChange={(e) => e.target.files?.[0] && pick(e.target.files[0])} />
 
-      {error && <p role="alert" style={{ color: "var(--flag)" }}>{error}</p>}
+      {error && <p role="alert">{error}</p>}
 
       {manifest && (
         <dl className="ledger-row">
@@ -76,12 +76,12 @@ export function Data({ onReady }: { onReady: (id: string) => void }) {
         </dl>
       )}
 
-      <button onClick={process} disabled={!manifest}>Process dataset</button>
+      <button onClick={process} className="primary" disabled={!manifest}>Process dataset</button>
 
       {status && <StageProgress {...status} />}
       {status?.stage === "ready" && <p style={{ color: "var(--ok)" }}>Ready — open Chat.</p>}
       {status?.stage === "failed" && (
-        <p role="alert" style={{ color: "var(--flag)" }}>
+        <p role="alert">
           {status.error} — <button onClick={process}>Retry</button>
         </p>
       )}

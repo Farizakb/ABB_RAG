@@ -45,8 +45,8 @@ export function Analytics() {
   // failure (e.g. a search keystroke) doesn't blank panels already loaded.
   return (
     <section>
-      {error && <p role="alert" style={{ color: "var(--flag)" }}>{error}</p>}
-      {!summary ? <p>Loading…</p> : <>
+      {error && <p role="alert">{error}</p>}
+      {!summary ? <p className="status">Loading…</p> : <>
       <StatTiles totals={summary.totals} />
 
       <h2>Questions over time</h2>
@@ -78,39 +78,43 @@ export function Analytics() {
 
       {/* Windowed to the same 7d as the charts and tiles above, not all time. */}
       <h2>Most-cited ABB pages</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          {summary.top_sources.map((s) => (
-            <tr key={s.url} className="ledger-row">
-              <td><a href={s.url} target="_blank" rel="noreferrer">{s.url}</a></td>
-              <td className="num">{s.count}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="table-scroll">
+        <table className="sources-table">
+          <tbody>
+            {summary.top_sources.map((s) => (
+              <tr key={s.url} className="ledger-row">
+                <td><a href={s.url} target="_blank" rel="noreferrer">{s.url}</a></td>
+                <td className="num">{s.count}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
 
       <h2>Every question asked</h2>
-      <p className="num" style={{ color: "var(--rule)" }}>{rows.length} of {total}</p>
+      <p className="num meta">{rows.length} of {total}</p>
       <input aria-label="Search questions" value={q} onChange={(e) => setQ(e.target.value)}
              placeholder="Search" />
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr className="ledger-row">
-            <th align="left">Time</th><th align="left">Question</th>
-            <th align="left">Outcome</th><th align="right">Latency</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.id} className="ledger-row">
-              <td className="num">{new Date(r.created_at).toLocaleString()}</td>
-              <td>{r.question}</td>
-              <td>{r.refused ? `refused (${r.refusal_class})` : "answered"}</td>
-              <td className="num">{r.latency_ms} ms</td>
+      <div className="table-scroll">
+        <table className="questions-table">
+          <thead>
+            <tr className="ledger-row">
+              <th align="left">Time</th><th align="left">Question</th>
+              <th align="left">Outcome</th><th align="right">Latency</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr key={r.id} className="ledger-row">
+                <td className="num">{new Date(r.created_at).toLocaleString()}</td>
+                <td>{r.question}</td>
+                <td>{r.refused ? `refused (${r.refusal_class})` : "answered"}</td>
+                <td className="num">{r.latency_ms} ms</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       </>}
     </section>
   );

@@ -9,10 +9,10 @@ export function StatTiles({ totals }: { totals: AnalyticsTotals }) {
     ["Total cost", `$${totals.cost_usd.toFixed(4)}`],
   ];
   return (
-    <div style={{ display: "flex", gap: "2rem" }}>
+    <div className="stat-tiles">
       {tiles.map(([label, value]) => (
-        <div key={label}>
-          <div style={{ color: "var(--rule)" }}>{label}</div>
+        <div key={label} className="stat-tile">
+          <div className="meta">{label}</div>
           <div className="num" style={{ fontSize: "1.6rem" }}>{value}</div>
         </div>
       ))}

@@ -19,7 +19,7 @@ function LedgerFooter({ sources, refused }: { sources: Source[]; refused?: boole
   return (
     <tfoot>
       <tr className="ledger-row">
-        <td colSpan={3} style={{ color: "var(--rule)" }}>
+        <td colSpan={3} className="meta">
           {!href ? (
             <>
               Call {HELPLINE}, or browse{" "}
@@ -44,36 +44,38 @@ export function SourceLedger({ sources, insufficient }: {
   sources: Source[]; insufficient?: boolean;
 }) {
   return (
-    <aside aria-label="Sources" style={{ borderLeft: "1px solid var(--rule)", paddingLeft: "1rem" }}>
-      <h2>
+    <aside aria-label="Sources">
+      <h2 className={sources.length === 0 ? "meta" : undefined}>
         {sources.length === 0
           ? "Nothing retrieved"
           : insufficient
             ? "Retrieved, judged insufficient"
             : "Sources used"}
       </h2>
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <tbody>
-          {sources.map((s) => (
-            <tr key={s.n} className="ledger-row" id={`source-${s.n}`}>
-              <td className="num">[{s.n}]</td>
-              <td>
-                <a href={s.url} target="_blank" rel="noreferrer">{s.title}</a>
-                <div style={{ color: "var(--rule)" }}>{s.section_path.join(" › ")}</div>
-                {/* Ruling: index + attribute keeps the key unique even when two
-                    facts on the same source share an attribute name. */}
-                {s.facts.map((f, i) => (
-                  <div key={`${i}-${f.attribute}`}>
-                    {f.attribute}: <strong>{f.raw_fragment}</strong>
-                  </div>
-                ))}
-              </td>
-              <td className="num">{s.score.toFixed(3)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <LedgerFooter sources={sources} refused={insufficient} />
-      </table>
+      <div className="table-scroll">
+        <table>
+          <tbody>
+            {sources.map((s) => (
+              <tr key={s.n} className="ledger-row" id={`source-${s.n}`}>
+                <td className="num">[{s.n}]</td>
+                <td>
+                  <a href={s.url} target="_blank" rel="noreferrer">{s.title}</a>
+                  <div className="meta">{s.section_path.join(" › ")}</div>
+                  {/* Ruling: index + attribute keeps the key unique even when two
+                      facts on the same source share an attribute name. */}
+                  {s.facts.map((f, i) => (
+                    <div key={`${i}-${f.attribute}`}>
+                      {f.attribute}: <strong>{f.raw_fragment}</strong>
+                    </div>
+                  ))}
+                </td>
+                <td className="num">{s.score.toFixed(3)}</td>
+              </tr>
+            ))}
+          </tbody>
+          <LedgerFooter sources={sources} refused={insufficient} />
+        </table>
+      </div>
     </aside>
   );
 }
