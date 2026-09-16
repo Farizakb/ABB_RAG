@@ -1,9 +1,9 @@
 // apps/web/src/api.ts
 //
 // Types mirror packages/contracts/contracts/models.py field-for-field.
-// Runtime response shapes for /analytics and /interactions aren't yet
-// defined in contracts (chat's analytics.py ships later), so those two
-// calls are typed as unknown rather than guessing a schema.
+// AnalyticsSummary and InteractionsResponse mirror
+// services/chat/app/analytics.py's summary()/interactions() return shapes
+// field-for-field instead, since those two aren't Pydantic contracts.
 
 export type SourceClass = "product" | "campaign" | "corporate" | "stub" | "volatile" | "index";
 export type RefusalClass = "out_of_scope" | "advisory" | "unsafe";
@@ -78,6 +78,48 @@ export type QuestionResponse = {
   timings_ms: Record<string, number>;
 };
 
+export type VolumeDay = {
+  day: string;
+  answered: number;
+  refused_out_of_scope: number;
+  refused_advisory: number;
+  // Included by analytics.py's VOLUME query even though the demo seed
+  // (scripts/seed_demo.py) never produces an unsafe refusal — kept so the
+  // type doesn't silently drop a real count if one ever occurs.
+  refused_unsafe: number;
+};
+
+export type TopSource = { url: string; count: number };
+
+export type AnalyticsTotals = {
+  questions: number;
+  median_latency_ms: number;
+  grounded_rate: number;
+  cost_usd: number;
+};
+
+export type AnalyticsSummary = {
+  volume_by_day: VolumeDay[];
+  grounded_rate: number;
+  refusal_rate: number;
+  // Windowed by the same `window` param as volume_by_day/totals, not all-time.
+  top_sources: TopSource[];
+  totals: AnalyticsTotals;
+};
+
+export type InteractionRow = {
+  id: string;
+  created_at: string;
+  question: string;
+  answer: string;
+  grounded: boolean;
+  refused: boolean;
+  refusal_class?: RefusalClass | null;
+  latency_ms: number;
+};
+
+export type InteractionsResponse = { items: InteractionRow[]; total: number };
+
 const json = async (r: Response) => {
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail ?? `HTTP ${r.status}`);
   return r.json();
@@ -91,7 +133,8 @@ export const api = {
   ask: (corpus_id: string, question: string, session_id: string): Promise<QuestionResponse> =>
     fetch("/api/v1/questions", { method: "POST", headers: { "content-type": "application/json" },
       body: JSON.stringify({ corpus_id, question, session_id }) }).then(json),
-  analytics: (window = "7d"): Promise<unknown> => fetch(`/api/v1/analytics/summary?window=${window}`).then(json),
-  interactions: (q = "", limit = 50): Promise<unknown> =>
+  analytics: (window = "7d"): Promise<AnalyticsSummary> =>
+    fetch(`/api/v1/analytics/summary?window=${window}`).then(json),
+  interactions: (q = "", limit = 50): Promise<InteractionsResponse> =>
     fetch(`/api/v1/interactions?q=${encodeURIComponent(q)}&limit=${limit}`).then(json),
 };

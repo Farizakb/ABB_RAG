@@ -1,15 +1,17 @@
 // apps/web/src/App.tsx
 //
-// Scaffold shell (Task 26), mounting Data (Task 27) and Chat (Task 28).
-// Chat lays out its own conversation column + right-rail SourceLedger per
-// SPEC.md §11.4, so this shell no longer carries a placeholder <aside> —
-// keeping one here would duplicate the ledger Chat already renders.
+// Scaffold shell (Task 26), mounting Data (Task 27), Chat (Task 28) and
+// Analytics (Task 30). Chat lays out its own conversation column +
+// right-rail SourceLedger per SPEC.md §11.4, so this shell no longer
+// carries a placeholder <aside> — keeping one here would duplicate the
+// ledger Chat already renders.
 import { useCallback, useState } from "react";
 import { Data } from "./screens/Data";
 import { Chat } from "./screens/Chat";
+import { Analytics } from "./screens/Analytics";
 
 export default function App() {
-  const [tab, setTab] = useState<"data" | "chat">("data");
+  const [tab, setTab] = useState<"data" | "chat" | "analytics">("data");
   const [corpusId, setCorpusId] = useState<string | null>(null);
 
   // useCallback: onReady sits in Data's effect deps, so a fresh function
@@ -30,9 +32,17 @@ export default function App() {
                   aria-current={tab === "chat" ? "page" : undefined}>
             Chat
           </button>
+          {/* Not gated on corpusId: it reads the stored interaction record
+              (Task 25's aggregations), which is independent of whatever
+              corpus this browser session has loaded. */}
+          <button onClick={() => setTab("analytics")}
+                  aria-current={tab === "analytics" ? "page" : undefined}>
+            Analytics
+          </button>
         </nav>
         {tab === "data" && <Data onReady={onReady} />}
         {tab === "chat" && corpusId && <Chat corpusId={corpusId} />}
+        {tab === "analytics" && <Analytics />}
       </main>
     </div>
   );
