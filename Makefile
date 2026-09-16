@@ -3,7 +3,12 @@ scrape:  ; docker compose --profile scraper run --rm scraper --max-pages 400
 up:      ; docker compose up -d --build
 down:    ; docker compose down
 ingest:  ; python scripts/ingest_fixture.py fixtures/corpus_sample.json
-demo:    ; $(MAKE) up && sleep 5 && $(MAKE) ingest && python scripts/seed_demo.py
+demo:
+	$(MAKE) up
+	@echo "waiting for health…" && sleep 8
+	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	 python scripts/seed_demo.py $$CID && \
+	 echo "\nOpen http://localhost:8080 — corpus $$CID is ready with seeded history."
 eval:    ; PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden evals/golden.jsonl --out evals/report.md
 # services/rag/app and services/chat/app are both top-level package `app`, so a
 # single bare pytest run can't import both. Run per project instead, and skip
