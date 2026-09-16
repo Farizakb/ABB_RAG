@@ -154,3 +154,55 @@ either a hand-written synonym map — which would fit the eval set rather than t
 language — or a cross-encoder reranker, which was dropped on cost. Both are recorded
 as rejected options in [ADR-0005](adr/0005-retrieval-and-embedding.md), not as work
 left undone.
+
+---
+
+## 6. ADR-0005's numbers had drifted from the corpus that ships
+
+**Observed.** Row 1 of ADR-0005's decision table claimed fused retrieval scored
+34/43 (79%) on the shipped configuration; row 5, describing that same fused
+configuration, claimed 30/43. Both rows describe one system on one corpus — they
+cannot both be true.
+
+**Hypothesis.** The ADR's Status section said every number was re-run on corpus
+`90e08090` (280 documents). The artifact that actually ships is
+`fixtures/corpus_sample.json` — corpus
+`713ea0871c2f68f7662420bdd03d9d89fbc8e7b7fa610992a3100f1ddfbcf8ed`, 243 documents,
+560 chunks — a different, later corpus that `make demo` and the committed
+`evals/report.md` both use. The ADR was last measured before that corpus existed
+and was never re-checked against it; the 34/43-vs-30/43 split is exactly what
+appears if some rows were updated against the shipping corpus (30/43 matches
+`evals/report.md`'s committed hit@5 of 0.698 exactly) while the table and
+Consequences prose elsewhere were not.
+
+**Change.** `scripts/ablate_retrieval.py`, which imports `retrieval.py`'s own
+`DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`, `_tsquery`, `_fold` and
+`RANK_DEPTH` (never modifying that module) and re-runs items 1, 2 and 4 — the
+retrieval-only questions, no generation involved — as isolated per-leg SQL
+against the corpus that ships, over the 43 `evals/golden.jsonl` rows carrying
+`expected_source_urls`. Item 3 is restated with its original corpus named; item 5
+(the embedder bake-off) is carried forward unchanged, with a sentence saying why
+it was not re-run (re-running it means writing a second `embedding_model` index
+into the live database — Invariant 8). ADR-0005 rewritten in place so every
+"Measured" cell names the corpus it came from.
+
+**Before → after** (fused hit@5, the ADR's headline number):
+
+| | before (claimed, corpus `90e08090`, internally contradictory) | after (measured, corpus `713ea087…`) |
+|---|---|---|
+| fused, all | 34/43 (79%) [row 1] vs 30/43 (70%) [row 5] | 30/43 (70%) |
+| informal | 65% | 45% |
+| right-section | 84% | not reproducible from committed data |
+| held-out | 57% | 57% (corpus `90e08090…`, not re-measured — out of this task's scope) |
+
+The corrected 30/43 (0.698) is not a new number invented for this entry — it
+matches the committed `evals/report.md`'s retrieval hit@5 exactly, which is the
+cross-check that makes it trustworthy rather than merely convenient.
+
+One further, unplanned finding came out of re-running item 2 (stub exclusion) on
+the shipping corpus: the pre-committed rule ("out if product hit@5 drops at all")
+now points the other way. Excluding stub pages *raises* fused hit@5 here (30/43 →
+32/43, product subset 30/39 → 32/39) instead of lowering it, the opposite of what
+the retired corpus showed. That reversal is recorded in ADR-0005 Item 2 as an open
+finding, not acted on here: implementing it means editing `retrieval.py`, which
+this task did not touch.
