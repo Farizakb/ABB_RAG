@@ -22,6 +22,7 @@ container, the same way the `eval` target in Makefile already does:
 Read-only: every query here is a SELECT against the already-ingested corpus
 named by --corpus. Nothing is written to the database.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -29,6 +30,7 @@ import json
 import pathlib
 from typing import Any
 
+from app.config import settings
 from app.db import get_conn
 from app.embedder import OpenAIEmbedder
 from app.retrieval import (
@@ -93,10 +95,11 @@ def run_legs(
     dense_sql: str,
     fts_sql: str,
     trgm_sql: str,
-) -> tuple[list[Any], list[Any], list[Any]]:
+) -> tuple[list[Any], list[Any], list[Any], dict[Any, float]]:
     """The three per-leg ranked document-id lists, RANK_DEPTH deep, exactly as
     `retrieve()` builds them -- only the SQL text passed in differs (stub-excluded
-    or not)."""
+    or not). Also returns the dense leg's id->score map, which the fused gate in
+    `hit()` needs to replicate production's dense-membership walk."""
     dense_rows = conn.execute(
         dense_sql, {"q": str(vector), "corpus": corpus, "model": model, "k": RANK_DEPTH}
     ).fetchall()
@@ -109,10 +112,39 @@ def run_legs(
         [r[0] for r in dense_rows],
         [r[0] for r in fts_rows],
         [r[0] for r in trgm_rows],
+        {r[0]: float(r[1]) for r in dense_rows},
     )
 
 
-def hit(ranked_ids: list[Any], expected_ids: set[Any], depth: int = 5) -> bool:
+def hit(
+    ranked_ids: list[Any],
+    expected_ids: set[Any],
+    depth: int = 5,
+    dense_scores: dict[Any, float] | None = None,
+) -> bool:
+    """Doc-level hit@depth.
+
+    Per-leg call sites (dense_hit/fts_hit/trgm_hit) pass no `dense_scores` and
+    score each leg's own raw top `depth` unfiltered -- those describe a leg
+    alone, and the dense-membership gate below does not exist for any leg in
+    isolation.
+
+    Fused call sites pass `dense_scores` because production
+    (`services/rag/app/retrieval.py:203-213`) walks the fused order and keeps
+    only documents that carry a proven dense-leg score at or above
+    `settings.retrieval_floor`, discarding the rest, before taking the top
+    k_prompt. A document the lexical legs alone would rank top-5 but that
+    never surfaces in the dense leg's RANK_DEPTH window is skipped in
+    production, so scoring the raw fused ranking here would disagree with
+    what users actually see.
+    """
+    if dense_scores is not None:
+        ranked_ids = [
+            doc_id
+            for doc_id in ranked_ids
+            if dense_scores.get(doc_id) is not None
+            and dense_scores[doc_id] >= settings.retrieval_floor
+        ]
     return bool(set(ranked_ids[:depth]) & expected_ids)
 
 
@@ -135,8 +167,12 @@ def main() -> int:
     embedder = OpenAIEmbedder()
     all_questions = [it["question"] for it in answerable] + [it["question"] for it in out_of_scope]
     vectors = embedder.embed(all_questions)
-    ans_vectors = dict(zip((it["id"] for it in answerable), vectors[: len(answerable)]))
-    oos_vectors = dict(zip((it["id"] for it in out_of_scope), vectors[len(answerable) :]))
+    ans_vectors = dict(
+        zip((it["id"] for it in answerable), vectors[: len(answerable)], strict=True)
+    )
+    oos_vectors = dict(
+        zip((it["id"] for it in out_of_scope), vectors[len(answerable) :], strict=True)
+    )
 
     with get_conn() as conn:
         docs = doc_info(conn, args.corpus)
@@ -151,15 +187,29 @@ def main() -> int:
             expected_ids = {url_to_id[u] for u in it["expected_source_urls"] if u in url_to_id}
             missing_urls = [u for u in it["expected_source_urls"] if u not in url_to_id]
 
-            dense_ids, fts_ids, trgm_ids = run_legs(
-                conn, args.corpus, embedder.model, vector, tsquery, folded,
-                DENSE_DOCS, FTS_DOCS, TRGM_DOCS,
+            dense_ids, fts_ids, trgm_ids, dense_scores = run_legs(
+                conn,
+                args.corpus,
+                embedder.model,
+                vector,
+                tsquery,
+                folded,
+                DENSE_DOCS,
+                FTS_DOCS,
+                TRGM_DOCS,
             )
             fused_ids = _rrf(dense_ids, fts_ids, trgm_ids)
 
-            dense_ns, fts_ns, trgm_ns = run_legs(
-                conn, args.corpus, embedder.model, vector, tsquery, folded,
-                DENSE_DOCS_NO_STUB, FTS_DOCS_NO_STUB, TRGM_DOCS_NO_STUB,
+            dense_ns, fts_ns, trgm_ns, dense_ns_scores = run_legs(
+                conn,
+                args.corpus,
+                embedder.model,
+                vector,
+                tsquery,
+                folded,
+                DENSE_DOCS_NO_STUB,
+                FTS_DOCS_NO_STUB,
+                TRGM_DOCS_NO_STUB,
             )
             fused_no_stub_ids = _rrf(dense_ns, fts_ns, trgm_ns)
 
@@ -182,8 +232,10 @@ def main() -> int:
                 "dense_hit": hit(dense_ids, expected_ids),
                 "fts_hit": hit(fts_ids, expected_ids),
                 "trgm_hit": hit(trgm_ids, expected_ids),
-                "fused_hit": hit(fused_ids, expected_ids),
-                "fused_no_stub_hit": hit(fused_no_stub_ids, expected_ids),
+                "fused_hit": hit(fused_ids, expected_ids, dense_scores=dense_scores),
+                "fused_no_stub_hit": hit(
+                    fused_no_stub_ids, expected_ids, dense_scores=dense_ns_scores
+                ),
                 "best_dense_score": best_dense_score,
             }
 
@@ -192,7 +244,8 @@ def main() -> int:
             qid = it["id"]
             vector = oos_vectors[qid]
             row = conn.execute(
-                DENSE_DOCS, {"q": str(vector), "corpus": args.corpus, "model": embedder.model, "k": 1}
+                DENSE_DOCS,
+                {"q": str(vector), "corpus": args.corpus, "model": embedder.model, "k": 1},
             ).fetchone()
             oos_best[qid] = float(row[1]) if row else 0.0
 
@@ -203,7 +256,12 @@ def main() -> int:
         return sum(per_item[i][key] for i in ids), len(ids)
 
     print("=== Item 1: dense vs lexical legs vs fused (recall@5, doc-level) ===")
-    for label, key in [("dense", "dense_hit"), ("fts", "fts_hit"), ("trgm", "trgm_hit"), ("fused", "fused_hit")]:
+    for label, key in [
+        ("dense", "dense_hit"),
+        ("fts", "fts_hit"),
+        ("trgm", "trgm_hit"),
+        ("fused", "fused_hit"),
+    ]:
         all_n, all_d = rate(key, list(per_item))
         inf_n, inf_d = rate(key, informal_ids)
         print(f"{label:>6}: all {pct(all_n, all_d)}  informal {pct(inf_n, inf_d)}")
@@ -221,10 +279,15 @@ def main() -> int:
     p_with_n, p_with_d = rate("fused_hit", product_ids)
     p_without_n, p_without_d = rate("fused_no_stub_hit", product_ids)
     print(f"all rows:      with stubs {pct(with_n, with_d)}  without {pct(without_n, without_d)}")
-    print(f"product subset (n={p_with_d}): with stubs {pct(p_with_n, p_with_d)}  without {pct(p_without_n, p_without_d)}")
+    print(
+        f"product subset (n={p_with_d}): with stubs {pct(p_with_n, p_with_d)}  "
+        f"without {pct(p_without_n, p_without_d)}"
+    )
 
     # ---- Item 4: retrieval floor ----
-    lowest_answerable = min(r["best_dense_score"] for r in per_item.values() if r["best_dense_score"] is not None)
+    lowest_answerable = min(
+        r["best_dense_score"] for r in per_item.values() if r["best_dense_score"] is not None
+    )
     lowest_id = min(
         (qid for qid, r in per_item.items() if r["best_dense_score"] is not None),
         key=lambda qid: per_item[qid]["best_dense_score"],
@@ -233,7 +296,10 @@ def main() -> int:
     highest_oos_id = max(oos_best, key=lambda k: oos_best[k])
     print("\n=== Item 4: retrieval floor ===")
     print(f"lowest answerable best-score: {lowest_answerable:.3f} ({lowest_id})")
-    print(f"highest out-of-scope best-score: {highest_oos:.3f} ({highest_oos_id}) over n={len(oos_best)}")
+    print(
+        f"highest out-of-scope best-score: {highest_oos:.3f} ({highest_oos_id}) "
+        f"over n={len(oos_best)}"
+    )
 
     if args.out:
         pathlib.Path(args.out).write_text(
