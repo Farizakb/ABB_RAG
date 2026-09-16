@@ -36,6 +36,7 @@ class Client:
         "Will I be approved for a mortgage?",
         "Mene hansi kredit daha uygundur?",
         "Maasim 1200 manatdir, ne qeder kredit goture bilerem?",
+        "Kreditə tesdiq alacağammı?",
     ],
 )
 def test_advisory_questions_refuse_and_route(seeded_corpus: str, db: Any, question: str) -> None:

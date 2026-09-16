@@ -1,5 +1,10 @@
 # ruff: noqa: RUF001
-from evals.runner import Report, _percentile, score_item
+import json
+import pathlib
+
+import pytest
+
+from evals.runner import Report, _percentile, main, score_item
 
 
 def test_retrieval_hit_at_5_matches_on_expected_source_url() -> None:
@@ -139,6 +144,88 @@ def test_grounded_rate_on_answerable_subset_ignores_non_answerable_rows() -> Non
     ]
     md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 5})
     assert "grounded rate, answerable only (n=3) | 0.667" in md
+
+
+def test_budget_table_shows_median_and_p95_with_separate_verdicts() -> None:
+    """Fix round 1, Finding 1: a passing median must never be published as the
+    sole verdict when p95 fails the same threshold. Nine fast items and one
+    slow outlier keep the median comfortably under 300ms while p95 blows
+    through it, so the table must show both numbers and both verdicts."""
+    values = [100] * 9 + [5000]
+    rows = [
+        {"type": "answerable", "grounded": True, "retrieval_ms": v, "generation_ms": 0}
+        for v in values
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": len(rows)})
+    assert "| retrieval < 300ms | 100.0 PASS | 2795.0 MISS | median PASS / p95 MISS |" in md
+
+
+def test_end_to_end_budget_percentiles_the_per_row_sum_not_the_sum_of_percentiles() -> None:
+    """Finding 1: e2e p95 must be percentile(retrieval_ms + generation_ms per
+    row), not percentile(retrieval_ms) + percentile(generation_ms) -- the
+    latter is a number no single request ever produced."""
+    retrieval = [100] * 9 + [5000]
+    generation = [200] * 9 + [100]
+    rows = [
+        {"type": "answerable", "grounded": True, "retrieval_ms": r, "generation_ms": g}
+        for r, g in zip(retrieval, generation, strict=True)
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": len(rows)})
+    correct_p95 = round(
+        _percentile([r + g for r, g in zip(retrieval, generation, strict=True)], 0.95), 1
+    )
+    wrong_p95 = round(_percentile(retrieval, 0.95), 1) + round(_percentile(generation, 0.95), 1)
+    assert correct_p95 != wrong_p95, "fixture must distinguish the two approaches"
+    assert f"{correct_p95} PASS" in md
+    assert f"{wrong_p95} PASS" not in md and f"{wrong_p95} MISS" not in md
+
+
+def test_headline_is_the_out_of_scope_and_advisory_wrong_answer_rate() -> None:
+    """Finding 2: SPEC §8.2's headline is the out_of_scope+advisory wrong-answer
+    rate, not the all-items rate -- both are real numbers and both are kept,
+    but only one is labelled the headline."""
+    rows = [
+        {"type": "answerable", "wrong_answer": True},
+        {"type": "answerable", "wrong_answer": False},
+        {"type": "out_of_scope", "wrong_answer": False},
+        {"type": "advisory", "wrong_answer": False},
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 4})
+    assert "Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, 0/2." in md
+    assert "Wrong-answer rate, all 4 items: 1/4." in md
+
+
+def test_from_rows_cli_renders_byte_identical_markdown_to_in_memory_rows(
+    tmp_path: pathlib.Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The whole point of --rows-out/--from-rows is that a presentation-only
+    change can be re-rendered for free -- so it must reproduce exactly what a
+    live run would have written, not an approximation of it."""
+    rows = [
+        {
+            "id": "a1",
+            "type": "answerable",
+            "grounded": True,
+            "wrong_answer": False,
+            "retrieval_ms": 120,
+            "generation_ms": 900,
+        }
+    ]
+    config = {"model": "gpt-5.6-luna", "embedder": "text-embedding-3-small", "items": 1}
+    expected = Report(rows=rows).markdown(config)
+
+    rows_path = tmp_path / "rows.json"
+    rows_path.write_text(json.dumps({"config": config, "rows": rows}), encoding="utf-8")
+    out_path = tmp_path / "report.md"
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["runner.py", "--from-rows", str(rows_path), "--out", str(out_path)],
+    )
+    exit_code = main()
+
+    assert exit_code == 0
+    assert out_path.read_text(encoding="utf-8") == expected
 
 
 def test_a_failed_enumeration_assertion_counts_as_a_wrong_answer() -> None:

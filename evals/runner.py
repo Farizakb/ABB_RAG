@@ -159,6 +159,17 @@ class Report:
     def exit_code(self) -> int:
         return 1 if any(r.get("wrong_answer") for r in self.rows) else 0
 
+    def _latency_budget_row(self, label: str, lat: dict[str, float], threshold: float) -> str:
+        """Both statistics, each with its own verdict, so a forgiving median
+        can never be published as the sole result directly above p95 data
+        that fails it -- SPEC §20 treats that as a quietly averaged-away miss."""
+        median_status = "PASS" if lat["median"] < threshold else "MISS"
+        p95_status = "PASS" if lat["p95"] < threshold else "MISS"
+        return (
+            f"| {label} | {lat['median']} {median_status} | {lat['p95']} {p95_status} | "
+            f"median {median_status} / p95 {p95_status} |"
+        )
+
     def markdown(self, config: dict[str, Any]) -> str:
         try:
             sha = subprocess.run(
@@ -173,8 +184,9 @@ class Report:
         wrong = [r for r in self.rows if r.get("wrong_answer")]
         answerable = [r for r in self.rows if r.get("type") == "answerable"]
         refusal_set = [r for r in self.rows if r.get("type") in ("out_of_scope", "advisory")]
+        wrong_refusal = [r for r in refusal_set if r.get("wrong_answer")]
         grounded_answerable = self._rate("grounded", answerable)
-        wrong_refusal_set = self._rate("wrong_answer", refusal_set)
+        wrong_refusal_rate = self._rate("wrong_answer", refusal_set)
         retrieval_lat = self._latency("retrieval_ms")
         generation_lat = self._latency("generation_ms")
         total_ms = [
@@ -182,12 +194,20 @@ class Report:
             for r in self.rows
             if r.get("retrieval_ms") is not None and r.get("generation_ms") is not None
         ]
-        e2e_median = round(_percentile(total_ms, 0.5), 1) if total_ms else 0.0
+        # Finding 1: the per-item sum, then percentiled -- not the sum of the
+        # two stages' separate p95s, which would overstate a value no single
+        # request actually saw.
+        e2e_lat = {
+            "median": round(_percentile(total_ms, 0.5), 1) if total_ms else 0.0,
+            "p95": round(_percentile(total_ms, 0.95), 1) if total_ms else 0.0,
+        }
         lines = [
             "# Eval report",
             "",
-            f"**Wrong-answer rate: {len(wrong)}/{len(self.rows)}** — the headline metric. "
-            "Abstention beats guessing.",
+            f"**Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, "
+            f"{len(wrong_refusal)}/{len(refusal_set)}.** Abstention beats guessing.",
+            "",
+            f"Wrong-answer rate, all {len(self.rows)} items: {len(wrong)}/{len(self.rows)}.",
             "",
             "| metric | value |",
             "|---|---|",
@@ -211,16 +231,29 @@ class Report:
             "",
             "## Budgets (SPEC §8.4 Global Constraints)",
             "",
+            "### Latency",
+            "",
+            "Both median and p95 are shown against the same threshold, each with its "
+            "own verdict -- a passing median does not stand in for a failing p95.",
+            "",
+            "| budget | median | p95 | status |",
+            "|---|---|---|---|",
+            self._latency_budget_row("retrieval < 300ms", retrieval_lat, 300),
+            self._latency_budget_row(
+                "end-to-end < 3000ms (per-item retrieval_ms + generation_ms, "
+                "median-of-sums / p95-of-sums)",
+                e2e_lat,
+                3000,
+            ),
+            "",
+            "### Correctness",
+            "",
             "| budget | measured | status |",
             "|---|---|---|",
-            f"| retrieval < 300ms (median) | {retrieval_lat['median']} | "
-            f"{'PASS' if retrieval_lat['median'] < 300 else 'MISS'} |",
-            f"| end-to-end < 3000ms (median retrieval_ms + generation_ms) | {e2e_median} | "
-            f"{'PASS' if e2e_median < 3000 else 'MISS'} |",
             f"| grounded rate, answerable ≥ 0.9 (n={len(answerable)}) | {grounded_answerable} | "
             f"{'PASS' if grounded_answerable >= 0.9 else 'MISS'} |",
             f"| wrong-answer rate, out_of_scope+advisory = 0 (n={len(refusal_set)}) | "
-            f"{wrong_refusal_set} | {'PASS' if wrong_refusal_set == 0 else 'MISS'} |",
+            f"{wrong_refusal_rate} | {'PASS' if wrong_refusal_rate == 0 else 'MISS'} |",
             "",
             f"config: `{json.dumps(config)}`  git: `{sha}`",
             "",
@@ -250,7 +283,30 @@ def main() -> int:
     ap.add_argument("--out", default="evals/report.md")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--mock", action="store_true")
+    ap.add_argument(
+        "--rows-out",
+        default="",
+        help="Write the scored rows + config as JSON here after a real run -- "
+        "provenance, and lets a later presentation-only change re-render the "
+        "report with --from-rows instead of paying for another run.",
+    )
+    ap.add_argument(
+        "--from-rows",
+        default="",
+        help="Render the report from a --rows-out JSON file instead of running "
+        "the eval. Makes zero API calls and touches no other flag.",
+    )
     args = ap.parse_args()
+
+    if args.from_rows:
+        # No app.embedder / app.generate import on this path -- rendering from
+        # already-scored rows must not need psycopg or openai, let alone spend
+        # money, or it would not be the escape hatch it is meant to be.
+        data = json.loads(pathlib.Path(args.from_rows).read_text("utf-8"))
+        report = Report(rows=data["rows"])
+        pathlib.Path(args.out).write_text(report.markdown(data["config"]), encoding="utf-8")
+        print(report.markdown(data["config"]))
+        return report.exit_code()
 
     from app.embedder import FakeEmbedder, OpenAIEmbedder
     from app.generate import OpenAIClient, answer
@@ -289,6 +345,10 @@ def main() -> int:
         "embedder": embedder.model,
         "items": len(items),
     }
+    if args.rows_out:
+        pathlib.Path(args.rows_out).write_text(
+            json.dumps({"config": config, "rows": report.rows}, indent=2), encoding="utf-8"
+        )
     pathlib.Path(args.out).write_text(report.markdown(config), encoding="utf-8")
     print(report.markdown(config))
     return report.exit_code()
