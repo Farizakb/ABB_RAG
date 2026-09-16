@@ -8,6 +8,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 
+def _percentile(values: list[int], p: float) -> float:
+    """Linear-interpolation percentile (numpy's default 'linear' method), so
+    `p=0.5` agrees with `statistics.median` and the runner needs no numpy
+    dependency for a handful of latency numbers."""
+    if not values:
+        return 0.0
+    s = sorted(values)
+    k = (len(s) - 1) * p
+    lo, hi = int(k), min(int(k) + 1, len(s) - 1)
+    if lo == hi:
+        return float(s[lo])
+    return s[lo] + (s[hi] - s[lo]) * (k - lo)
+
+
 def score_item(
     item: dict[str, Any],
     sources: list[Any],
@@ -18,6 +32,7 @@ def score_item(
     refusal_class: str | None = None,
     class_members: list[str] | None = None,
     index_exists: bool = False,
+    timings: dict[str, int] | None = None,
 ) -> dict[str, Any]:
     urls = {getattr(s, "url", s.get("url") if isinstance(s, dict) else "") for s in sources}
     expected = set(item.get("expected_source_urls", []))
@@ -64,6 +79,7 @@ def score_item(
         (must_refuse and not refused) or not exclude_ok or not numeric_ok or enumeration_ok is False
     )
 
+    timings = timings or {}
     return {
         "id": item.get("id"),
         "type": item.get("type"),
@@ -75,6 +91,9 @@ def score_item(
         "numeric_ok": numeric_ok,
         "enumeration_ok": enumeration_ok,
         "wrong_answer": wrong,
+        "grounded": grounded,
+        "retrieval_ms": timings.get("retrieval_ms"),
+        "generation_ms": timings.get("generation_ms"),
     }
 
 
@@ -124,9 +143,18 @@ def enumeration_context(corpus_id: str, item: dict[str, Any]) -> tuple[list[str]
 class Report:
     rows: list[dict[str, Any]] = field(default_factory=list)
 
-    def _rate(self, key: str) -> float:
-        vals = [r[key] for r in self.rows if r.get(key) is not None]
+    def _rate(self, key: str, rows: list[dict[str, Any]] | None = None) -> float:
+        rows = self.rows if rows is None else rows
+        vals = [r[key] for r in rows if r.get(key) is not None]
         return round(sum(vals) / len(vals), 3) if vals else 0.0
+
+    def _latency(self, key: str) -> dict[str, float]:
+        vals = [r[key] for r in self.rows if r.get(key) is not None]
+        return {
+            "median": round(_percentile(vals, 0.5), 1),
+            "p95": round(_percentile(vals, 0.95), 1),
+            "max": float(max(vals)) if vals else 0.0,
+        }
 
     def exit_code(self) -> int:
         return 1 if any(r.get("wrong_answer") for r in self.rows) else 0
@@ -143,6 +171,18 @@ class Report:
             # completed run's report to an exception raised after every paid call.
             sha = ""
         wrong = [r for r in self.rows if r.get("wrong_answer")]
+        answerable = [r for r in self.rows if r.get("type") == "answerable"]
+        refusal_set = [r for r in self.rows if r.get("type") in ("out_of_scope", "advisory")]
+        grounded_answerable = self._rate("grounded", answerable)
+        wrong_refusal_set = self._rate("wrong_answer", refusal_set)
+        retrieval_lat = self._latency("retrieval_ms")
+        generation_lat = self._latency("generation_ms")
+        total_ms = [
+            r["retrieval_ms"] + r["generation_ms"]
+            for r in self.rows
+            if r.get("retrieval_ms") is not None and r.get("generation_ms") is not None
+        ]
+        e2e_median = round(_percentile(total_ms, 0.5), 1) if total_ms else 0.0
         lines = [
             "# Eval report",
             "",
@@ -158,6 +198,29 @@ class Report:
             f"| must_not_include | {self._rate('exclude_ok')} |",
             f"| numeric agreement | {self._rate('numeric_ok')} |",
             f"| enumeration | {self._rate('enumeration_ok')} |",
+            f"| grounded rate, answerable only (n={len(answerable)}) | {grounded_answerable} |",
+            "",
+            "## Latency (ms)",
+            "",
+            "| stage | median | p95 | max |",
+            "|---|---|---|---|",
+            f"| retrieval | {retrieval_lat['median']} | {retrieval_lat['p95']} | "
+            f"{retrieval_lat['max']} |",
+            f"| generation | {generation_lat['median']} | {generation_lat['p95']} | "
+            f"{generation_lat['max']} |",
+            "",
+            "## Budgets (SPEC §8.4 Global Constraints)",
+            "",
+            "| budget | measured | status |",
+            "|---|---|---|",
+            f"| retrieval < 300ms (median) | {retrieval_lat['median']} | "
+            f"{'PASS' if retrieval_lat['median'] < 300 else 'MISS'} |",
+            f"| end-to-end < 3000ms (median retrieval_ms + generation_ms) | {e2e_median} | "
+            f"{'PASS' if e2e_median < 3000 else 'MISS'} |",
+            f"| grounded rate, answerable ≥ 0.9 (n={len(answerable)}) | {grounded_answerable} | "
+            f"{'PASS' if grounded_answerable >= 0.9 else 'MISS'} |",
+            f"| wrong-answer rate, out_of_scope+advisory = 0 (n={len(refusal_set)}) | "
+            f"{wrong_refusal_set} | {'PASS' if wrong_refusal_set == 0 else 'MISS'} |",
             "",
             f"config: `{json.dumps(config)}`  git: `{sha}`",
             "",
@@ -217,6 +280,7 @@ def main() -> int:
                 r.refusal_class,
                 class_members=members,
                 index_exists=index_exists,
+                timings=r.timings_ms,
             )
         )
 

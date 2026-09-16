@@ -9,7 +9,18 @@ demo:
 	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
 	 python scripts/seed_demo.py $$CID && \
 	 echo "\nOpen http://localhost:8080 — corpus $$CID is ready with seeded history."
-eval:    ; PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden evals/golden.jsonl --out evals/report.md
+# `rag` is the only container holding OPENAI_API_KEY and the only one that can
+# reach Postgres by its compose hostname (`db`) -- psycopg from the host hits
+# psycopg_pool PoolTimeout even with a correct DSN (P132). So the golden set
+# is copied into `rag` and the runner executes there; the host only needs
+# httpx to derive/ingest the corpus id first, the same dependency `make demo`
+# already has.
+eval:
+	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	 docker compose cp evals rag:/tmp/evals && \
+	 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
+	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --out /tmp/report.md && \
+	 docker compose cp rag:/tmp/report.md evals/report.md
 # services/rag/app and services/chat/app are both top-level package `app`, so a
 # single bare pytest run can't import both. Run per project instead, and skip
 # any project a later task hasn't created yet rather than going red.

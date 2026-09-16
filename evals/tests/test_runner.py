@@ -1,5 +1,5 @@
 # ruff: noqa: RUF001
-from evals.runner import Report, score_item
+from evals.runner import Report, _percentile, score_item
 
 
 def test_retrieval_hit_at_5_matches_on_expected_source_url() -> None:
@@ -106,6 +106,39 @@ def test_enumeration_without_an_index_asserts_the_link_and_forbids_a_total_claim
             "enumeration_ok"
         ]
     )
+
+
+def test_percentile_linear_interpolation_over_a_known_list() -> None:
+    values = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    assert _percentile(values, 0.5) == 55.0
+    assert round(_percentile(values, 0.95), 1) == 95.5
+    assert _percentile(values, 0.0) == 10.0
+    assert _percentile([], 0.5) == 0.0
+
+
+def test_latency_table_reports_median_p95_max_in_markdown() -> None:
+    rows = [
+        {"type": "answerable", "grounded": True, "retrieval_ms": v, "generation_ms": v}
+        for v in [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 10})
+    assert "| retrieval | 55.0 | 95.5 | 100.0 |" in md
+    assert "| generation | 55.0 | 95.5 | 100.0 |" in md
+
+
+def test_grounded_rate_on_answerable_subset_ignores_non_answerable_rows() -> None:
+    """The budget's denominator is the answerable set only (SPEC §8.4) -- a
+    correct refusal on an out-of-scope or advisory item is not grounded and
+    must not drag the rate down, nor may it be counted as a free pass."""
+    rows = [
+        {"type": "answerable", "grounded": True},
+        {"type": "answerable", "grounded": True},
+        {"type": "answerable", "grounded": False},
+        {"type": "out_of_scope", "grounded": False},
+        {"type": "advisory", "grounded": False},
+    ]
+    md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 5})
+    assert "grounded rate, answerable only (n=3) | 0.667" in md
 
 
 def test_a_failed_enumeration_assertion_counts_as_a_wrong_answer() -> None:
