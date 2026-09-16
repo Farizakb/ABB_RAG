@@ -206,3 +206,62 @@ now points the other way. Excluding stub pages *raises* fused hit@5 here (30/43 
 the retired corpus showed. That reversal is recorded in ADR-0005 Item 2 as an open
 finding, not acted on here: implementing it means editing `retrieval.py`, which
 this task did not touch.
+
+---
+
+## 7. Entry 6's correction was itself measured against the artifact about to be retired
+
+**Observed.** Hashing every corpus artifact on disk
+(`corpus_id = sha256(json.dumps(sorted(d.content_hash for d in documents)))`,
+`packages/contracts/contracts/models.py:61-62`) against `rag.corpora` found three
+files, not two. `fixtures/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
+`data/corpus_20260913T163802Z.json` (also 243 docs, same id — a duplicate
+artifact) both matched a corpus ingested at `2026-09-15 15:35:10Z`.
+`data/corpus_20260915T151437Z.json` (280 docs, `90e08090d305…`) matched a
+*different*, already-`ready` corpus ingested twenty minutes earlier, at
+`15:15:33Z`. The 243-document fixture was not stale relative to a corpus that
+predates it — it was made the fixture *after* a larger corpus was already live.
+That makes it a regression, not a stale copy, and it was found by hashing
+artifacts against the database, not by reading `README.md` or `docs/adr/0005`,
+both of which had named the missing pointer documents by URL the whole time.
+
+**Hypothesis.** Entry 6 corrected ADR-0005's numbers to 30/43, "measured on the
+shipping corpus `713ea087…`" — every sentence in it was true when it was written.
+Its re-measurement was necessarily performed against whichever artifact
+`fixtures/corpus_sample.json` was at the time, which was `713ea087…`. What entry 6
+could not know is that `713ea087…` being the fixture was not settled fact: ruling
+P155 had proven the 30/43 figure was correctly measured against the artifact that
+then shipped, and consistent with the committed report — but ruling P164, that a
+larger, already-`ready` corpus had been ingested *before* `713ea087…` even
+existed, had not yet been established. Proving P164 is what reverses entry 6's
+conclusion. Entry 6's own method was not wrong; the artifact it measured was about
+to be retired.
+
+**Change.** `fixtures/corpus_sample.json` replaced with
+`data/corpus_20260915T151437Z.json` (280 documents, 736 chunks,
+`corpus_id = 90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`).
+`scripts/ablate_retrieval.py` re-run against `90e08090…`; `evals/report.md`
+regenerated against it. No re-ingest was needed — `90e08090…` was already `ready`
+in `rag.corpora`, confirmed by a no-op run of `scripts/ingest_fixture.py` that
+returned the corpus id immediately with no embedding calls logged.
+
+**Before → after**, both corpora named:
+
+| | `713ea087…` (243 docs, entry 6's figure) | `90e08090…` (280 docs, shipping now) |
+|---|---|---|
+| fused, all | 30/43 (70%) | 34/43 (79%) |
+| informal | 45% | 65% |
+| product subset, with stubs | 30/39 (77%) | 33/39 (85%) |
+| pointer documents present | neither `/filiallar` nor `/atmler` | both, confirmed in `rag.documents` |
+
+Entry 6 above is left exactly as written. It was correct given what P155 alone
+had established, and a log that edits its own history to look consistent after
+the fact is worth nothing.
+
+**The user-visible cost.** The two pointer documents are what Task 23 Item 3
+added specifically to stop branch and ATM questions being answered from
+`/android-privacypolicy`. The shipped fixture had neither. A reviewer asking
+where their nearest branch is, against the corpus that was about to ship, would
+have received exactly the `/android-privacypolicy` answer Task 23 existed to
+eliminate — the regression this entry corrects was not cosmetic, it was the
+specific failure mode ADR-0005 Item 3 exists to prevent.
