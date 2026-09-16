@@ -26,23 +26,25 @@ export default function App() {
           the page: Data sets it on its own section, Chat carries it in the grid
           template, and Analytics is table-first and needs the full width. */}
       <main>
-        <h1>ABB Assistant</h1>
-        <nav>
-          <button onClick={() => setTab("data")} aria-current={tab === "data" ? "page" : undefined}>
-            Data
-          </button>
-          <button onClick={() => setTab("chat")} disabled={!corpusId}
-                  aria-current={tab === "chat" ? "page" : undefined}>
-            Chat
-          </button>
-          {/* Not gated on corpusId: it reads the stored interaction record
-              (Task 25's aggregations), which is independent of whatever
-              corpus this browser session has loaded. */}
-          <button onClick={() => setTab("analytics")}
-                  aria-current={tab === "analytics" ? "page" : undefined}>
-            Analytics
-          </button>
-        </nav>
+        <header>
+          <h1>ABB Assistant</h1>
+          <nav>
+            <button onClick={() => setTab("data")} aria-current={tab === "data" ? "page" : undefined}>
+              Data
+            </button>
+            <button onClick={() => setTab("chat")} disabled={!corpusId}
+                    aria-current={tab === "chat" ? "page" : undefined}>
+              Chat
+            </button>
+            {/* Not gated on corpusId: it reads the stored interaction record
+                (Task 25's aggregations), which is independent of whatever
+                corpus this browser session has loaded. */}
+            <button onClick={() => setTab("analytics")}
+                    aria-current={tab === "analytics" ? "page" : undefined}>
+              Analytics
+            </button>
+          </nav>
+        </header>
         {tab === "data" && <Data onReady={onReady} />}
         {tab === "chat" && corpusId && <Chat corpusId={corpusId} />}
         {tab === "analytics" && <Analytics />}

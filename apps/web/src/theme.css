@@ -45,12 +45,25 @@ p { margin: 0 0 var(--space-3); line-height: 1.5; }
 
 /* Page shell rhythm -- the only <nav>/<main> in the app, so plain
    elements are safe, stable selectors. */
-/* Left-aligned, not centred (§11.4), so no auto margins. The cap keeps
+/* §11.4's "left-aligned throughout" governs text and column alignment
+   inside the app (body copy, the conversation column) -- it says nothing
+   about where the shell sits in the viewport. The cap below keeps
    Analytics' tables readable on a wide monitor without reintroducing the
    68ch page-wide measure that was squeezing the ledger rail and wrapping
-   the stat tiles onto a second row. */
-main { padding: var(--space-4); max-width: 72rem; }
-nav { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-bottom: var(--space-3); }
+   the stat tiles onto a second row; centring that capped shell in the
+   viewport (P159) preserves every property §11.4 names -- text still
+   left-aligned, the two-column asymmetry and right-aligned numerics
+   untouched -- while removing the dead margin a plain max-width leaves on
+   one side of a wide monitor. */
+main { padding: var(--space-4); max-width: 72rem; margin-inline: auto; }
+nav { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Identity-and-navigation band, separated from the screen body by a rule
+   in the same ledger-row language the rest of the design uses to divide
+   rows -- no card, no shadow, no sticky positioning (§11.4 forbids all
+   three). */
+header { border-bottom: 1px solid var(--rule); padding-bottom: var(--space-3); margin-bottom: var(--space-4); }
+header h1 { margin-bottom: var(--space-3); }
 
 /* Nav reads as tabs. aria-current="page" already marks the active one;
    state is colour + rule only, never font-weight, so activating a tab

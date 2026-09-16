@@ -53,18 +53,24 @@ export function Data({ onReady }: { onReady: (id: string) => void }) {
     return () => clearInterval(timer);
   }, [manifest?.corpus_id, onReady]);
 
+  // No maxWidth on the section itself: the 68ch measure is right for the
+  // prose and the manifest below (reading content), but capping the whole
+  // screen to it left the Data tab reading as a narrow ribbon on a wide
+  // monitor. The cap stays on the reading elements only.
   return (
-    <section style={{ maxWidth: "var(--measure)" }}>
+    <section>
       <h1>Load the ABB corpus</h1>
-      <p>Run <code>make scrape</code> first, then pick the generated <code>corpus_*.json</code>.</p>
+      <p style={{ maxWidth: "var(--measure)" }}>
+        Run <code>make scrape</code> first, then pick the generated <code>corpus_*.json</code>.
+      </p>
 
       <input type="file" accept="application/json" aria-label="Corpus file"
              onChange={(e) => e.target.files?.[0] && pick(e.target.files[0])} />
 
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" style={{ maxWidth: "var(--measure)" }}>{error}</p>}
 
       {manifest && (
-        <dl className="ledger-row">
+        <dl className="ledger-row" style={{ maxWidth: "var(--measure)" }}>
           <dt>Pages</dt><dd className="num">{manifest.pages}</dd>
           <dt>localStorage used</dt>
           <dd className="num">{(manifest.quota_bytes / 1e6).toFixed(2)} MB (UTF-16)</dd>
@@ -81,7 +87,7 @@ export function Data({ onReady }: { onReady: (id: string) => void }) {
       {status && <StageProgress {...status} />}
       {status?.stage === "ready" && <p style={{ color: "var(--ok)" }}>Ready — open Chat.</p>}
       {status?.stage === "failed" && (
-        <p role="alert">
+        <p role="alert" style={{ maxWidth: "var(--measure)" }}>
           {status.error} — <button onClick={process}>Retry</button>
         </p>
       )}
