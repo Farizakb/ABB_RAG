@@ -35,7 +35,13 @@ project owner, labelled from corpus text, never used to tune retrieval).
 | 2 | stubs in corpus | out if product hit@5 drops at all | corpus `90e08090…`: with stubs 34/43 (79%), product subset 33/39 (85%); without stubs 32/43 (74%), product subset **32/39 (82%)** — excluding stubs drops product hit@5 (33/39 → 32/39) | **stubs stay in** |
 | 3 | branch pointer | only if bank-facts fails | without a pointer, branch and ATM questions were answered from `/android-privacypolicy`; with one, they resolve to `/filiallar` and `/atmler` — observed live on the shipping corpus `90e08090…` (Task 23 Item 3); both pointer documents are present in `rag.documents` for this corpus | **two pointers** |
 | 4 | retrieval floor | below lowest answerable best-score | corpus `90e08090…`: lowest answerable 0.311 (a41), highest out-of-scope **0.609** (r06, n=9) — the classes still overlap across nearly the whole range | **floor stays 0.0** |
-| 5 | embedder | winner on hit@5 over the golden queries | corpus `90e08090…`: `3-small` dense-only 28/43 vs `3-large@1536` 26/43; **fused 30/43 vs 30/43** | **3-small** |
+| 5 | embedder | winner on hit@5 over the golden queries | corpus `90e08090…`: `3-small` dense-only 28/43 vs `3-large@1536` 26/43; **fused 30/43 vs 30/43**¹ | **3-small** |
+
+¹ Item 5 comes from the earlier embedder bake-off and was not re-run. Its absolute
+fused score (30/43) does not match Item 1's current measurement of the same shipped
+configuration (34/43). The comparison between the two embedders is like-for-like
+*within* that run, so the decision stands. Do not compare Item 5's absolute numbers
+with Item 1's.
 
 ### Item 1 — the lexical channel earns its place
 

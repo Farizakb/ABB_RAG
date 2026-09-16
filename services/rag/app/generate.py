@@ -203,8 +203,8 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
             # Ruling 4: a small_talk label the model attached to an answer
             # that still carries a fact must not dodge the cite-or-refuse
             # gate -- treat it exactly like a failed grounding check.
-            klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
-            return _refuse(r.sources, klass, r.candidates, timings, usage)
+            leak_klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
+            return _refuse(r.sources, leak_klass, r.candidates, timings, usage)
         clean = URL_IN_TEXT.sub("", out.answer).replace("  ", " ").strip()
         return AnswerResponse(
             answer=clean,
