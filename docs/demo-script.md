@@ -147,15 +147,14 @@ project's own early planning recommended before the brief's actual wording was r
 
 ## 7. The traceability table, then "what I'd do differently at scale" (90s)
 
-Open the README's [traceability table](../README.md#requirement-traceability-spec-1-verbatim).
+Open the README's [requirements coverage table](../README.md#requirements-coverage).
 Walk it as a reviewer would: every row but one is demonstrable in the running stack or by opening
-a file directly. Say the one honest exception plainly rather than let it be found later: R10
-originally read "three charts plus a table" and shipped as two charts plus two tables — a
-pre-committed, documented cut under day-five time pressure, not a discovery made during this
-walkthrough.
+a file directly. Say the one honest exception plainly rather than let it be found later: the
+charting requirement originally aimed for three charts plus a table and shipped as two charts plus
+two tables — a pre-committed, documented cut under day-five time pressure, not a discovery made
+during this walkthrough.
 
-Close on ["What I'd do differently at scale"](../README.md#what-id-do-differently-at-scale) and
-[Known limitations](../README.md#known-limitations--what-production-would-add). Naming the
+Close on [Known limitations](../README.md#known-limitations--what-production-would-add). Naming the
 phase-dependence of your own architecture, and the concerns a five-day build deliberately did not
 implement, is the clearest seniority signal available in a written artifact — and it pre-empts
 the questions the panel was going to ask anyway.
