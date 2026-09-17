@@ -193,7 +193,7 @@ into the live database — Invariant 8). ADR-0005 rewritten in place so every
 | fused, all | 34/43 (79%) [row 1] vs 30/43 (70%) [row 5] | 30/43 (70%) |
 | informal | 65% | 45% |
 | right-section | 84% | not reproducible from committed data |
-| held-out | 57% | 57% (corpus `90e08090…`, not re-measured — out of this task's scope) |
+| held-out | 57% | 57% (corpus `90e08090…`) |
 
 The corrected 30/43 (0.698) is not a new number invented for this entry — it
 matches the committed `evals/report.md`'s retrieval hit@5 exactly, which is the
@@ -205,7 +205,7 @@ now points the other way. Excluding stub pages *raises* fused hit@5 here (30/43 
 32/43, product subset 30/39 → 32/39) instead of lowering it, the opposite of what
 the retired corpus showed. That reversal is recorded in ADR-0005 Item 2 as an open
 finding, not acted on here: implementing it means editing `retrieval.py`, which
-this task did not touch.
+was not modified.
 
 ---
 

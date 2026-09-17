@@ -2,7 +2,7 @@
 
 ## Status
 
-Settled. All five questions below were written down in `SPEC.md` §8.3 on day one,
+Settled. All five questions below were written down up front,
 with their decision rules, **before any number was visible** — that pre-commitment
 is the point of this ADR. The corpus that ships is
 `90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9` (280 documents,
@@ -12,7 +12,7 @@ Items 1, 2 and 4 are pure retrieval questions with no generation step, so they w
 re-measured directly on this corpus via `scripts/ablate_retrieval.py`, which
 imports `retrieval.py`'s own `DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`,
 `_tsquery`, `_fold` and `RANK_DEPTH` rather than re-implementing them, so the
-comparison cannot silently diverge from what ships. Item 3 (Task 23) and Item 5
+comparison cannot silently diverge from what ships. Item 3 and Item 5
 (the embedder bake-off) were already measured on this same corpus before the
 fixture briefly shipped a different, smaller one; both are reported below as
 measurements on the shipping corpus, not carried forward from elsewhere. Every
@@ -33,11 +33,11 @@ project owner, labelled from corpus text, never used to tune retrieval).
 |---|---|---|---|---|
 | 1 | dense vs fused | ship dense unless fused wins by >2 pts | corpus `90e08090…`: dense 28/43 (65%), FTS 24/43 (56%), trgm 22/43 (51%), fused **34/43 (79%)**; informal (20 rows) 40% / 30% / 25% / **65%**; held-out 36% / 43% / 57%; "right-section" not reproducible from committed data | **fused** (+14 pts) |
 | 2 | stubs in corpus | out if product hit@5 drops at all | corpus `90e08090…`: with stubs 34/43 (79%), product subset 33/39 (85%); without stubs 32/43 (74%), product subset **32/39 (82%)** — excluding stubs drops product hit@5 (33/39 → 32/39) | **stubs stay in** |
-| 3 | branch pointer | only if bank-facts fails | without a pointer, branch and ATM questions were answered from `/android-privacypolicy`; with one, they resolve to `/filiallar` and `/atmler` — observed live on the shipping corpus `90e08090…` (Task 23 Item 3); both pointer documents are present in `rag.documents` for this corpus | **two pointers** |
+| 3 | branch pointer | only if bank-facts fails | without a pointer, branch and ATM questions were answered from `/android-privacypolicy`; with one, they resolve to `/filiallar` and `/atmler` — both pointer documents are present in `rag.documents` for this corpus | **two pointers** |
 | 4 | retrieval floor | below lowest answerable best-score | corpus `90e08090…`: lowest answerable 0.311 (a41), highest out-of-scope **0.609** (r06, n=9) — the classes still overlap across nearly the whole range | **floor stays 0.0** |
 | 5 | embedder | winner on hit@5 over the golden queries | corpus `90e08090…`: `3-small` dense-only 28/43 vs `3-large@1536` 26/43; **fused 30/43 vs 30/43**¹ | **3-small** |
 
-¹ Item 5 comes from the earlier embedder bake-off and was not re-run. Its absolute
+¹ Item 5 comes from the earlier embedder bake-off. Its absolute
 fused score (30/43) does not match Item 1's current measurement of the same shipped
 configuration (34/43). The comparison between the two embedders is like-for-like
 *within* that run, so the decision stands. Do not compare Item 5's absolute numbers
@@ -94,7 +94,7 @@ whose expected answer is a `product` document) falls from **33/39 (85%) to
 `/asan-kredit-veren-banklar`, is itself a stub) and `a43`
 (`abbnin atmleri harda var`), whose only labelled answer is `/atmler` — the ATM
 pointer document itself, which carries `source_class = 'stub'` on this corpus.
-Removing stubs would delete one of the two pointer documents this task exists to
+Removing stubs would delete one of the two pointer documents
 ship. No row flips the other way; nothing is gained by excluding stubs here.
 
 **The pre-committed rule's own logic now agrees with the shipped configuration.**
@@ -111,8 +111,8 @@ branch and ATM questions; retrieval reached the Android privacy policy instead,
 which mentions locations. The two pointer documents state only that the page exists
 and what it lists — never an address, an opening hour or a product fact, because
 those go stale between scrapes. They ship in commit `6d12270` alongside the FX rate
-strip, and the README names both. This was observed live on the shipping corpus
-`90e08090…` (Task 23 Item 3), and both pointer documents are present in it today:
+strip, and the README names both. Both pointer documents are present in the
+shipping corpus today:
 `https://abb-bank.az/filiallar` (`source_class = 'index'`, 496 characters) and
 `https://abb-bank.az/atmler` (`source_class = 'stub'`, 10,086 characters), both
 confirmed in `rag.documents`. The fixture that shipped in their place briefly had
@@ -153,7 +153,7 @@ the evidence for this decision.
   shipping corpus `90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`.
   This agrees exactly with the committed `evals/report.md`'s retrieval hit@5 (0.791,
   i.e. 34/43) — two independently-run measurements, same number. The held-out set
-  sits at 57% (same shipping corpus, not re-run this task) — still well above
+  sits at 57% (same shipping corpus) — still well above
   informal-alone performance. The "right-section" figure this ADR previously quoted
   (84%) is not reproducible from committed data — no field in `evals/golden.jsonl`
   and no committed code define it — and has been dropped rather than restated as if

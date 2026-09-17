@@ -2,7 +2,7 @@
 
 ## Status
 
-Settled on day one. Unrevisited — nothing in five days of measurement gave a reason to add one.
+Settled early. Unrevisited — measurement gave no reason to add one.
 
 ## Context
 
@@ -35,7 +35,7 @@ without touching business logic. None of those apply here.
 ## Decision
 
 **Call the `openai` SDK directly.** `backend/rag/rag/embedder.py` wraps embedding calls behind a
-one-function `Embedder` Protocol (so the day-three embedder bake-off — see
+one-function `Embedder` Protocol (so the embedder bake-off — see
 [ADR-0005](0005-retrieval-and-embedding.md) — is a config change, not a refactor, and so tests can
 substitute a fake without a real API call); `generate.py` wraps the completion call behind an
 equally small `Completion` Protocol for the same reason. Structured output uses the OpenAI
@@ -54,9 +54,8 @@ failing closed to a refusal.
   behind one interface, an agentic loop — is the point at which this decision should be revisited.
   Nothing here claims a framework is never justified; this system's shape, today, does not need
   one.
-- One fewer dependency to pin, update, and explain the version-compatibility surface of, in a
-  five-day build where every added dependency needs a one-line justification (a standing rule for
-  this project's dependency choices).
+- One fewer dependency to pin, update, and explain the version-compatibility surface of — a
+  standing rule for this project's dependency choices.
 
 ## Rejected
 

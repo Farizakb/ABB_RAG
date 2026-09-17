@@ -2,9 +2,8 @@
 
 ## Status
 
-Settled on day one, unrevisited during the build. The internal spec's own overengineering audit
-(`CUT_LIST.md` item A1) originally recommended the opposite seam — this ADR records why that
-recommendation was overridden.
+Settled early, unrevisited during the build. An earlier overengineering audit originally 
+recommended the opposite seam — this ADR records why that recommendation was overridden.
 
 ## Context
 
@@ -73,9 +72,8 @@ is reachable only from `chat`'s container on the compose network.
   owners for no benefit: nothing reads ingested-but-not-yet-searchable data independently of the
   retrieval path it feeds, so the split adds a network hop and a second thing to keep in sync with
   no reader on the other side of the boundary.
-- **The `ingestion` + `chat` seam** (this repo's own earlier plan, `CUT_LIST.md` item A1, and the
-  seam the internal overengineering audit originally recommended). It divides along an axis the
-  requirement never names ("ingestion" versus "everything else") while leaving the axis the
-  requirement does name — question handling versus response generation — entirely undivided inside
-  "everything else." A reviewer checking the microservice requirement against this seam would have
-  to infer the mapping rather than read it off the service names.
+- **The `ingestion` + `chat` seam** (an alternative that was originally considered). It divides 
+  along an axis the requirement never names ("ingestion" versus "everything else") while leaving 
+  the axis the requirement does name — question handling versus response generation — entirely 
+  undivided inside "everything else." A reviewer checking the microservice requirement against 
+  this seam would have to infer the mapping rather than read it off the service names.

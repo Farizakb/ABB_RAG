@@ -5,9 +5,8 @@
 Settled, and confirmed live. The apparent conflict — one requirement calls for the extracted data
 to live in the browser's `localStorage`; another calls for it formatted into a vector database —
 is resolved by treating them as two different writes of two different things, not one artifact
-doing two jobs. The measurement this ADR rests on was pending through most of the build (day-one
-gate item V-4, `RECON.md`, required a browser to answer) and was finally taken live against the
-running stack on 2026-09-16, against the shipping corpus (`90e08090…`, 280 documents).
+doing two jobs. The measurement this ADR rests on was taken live against the running stack on 
+2026-09-16, against the shipping corpus (`90e08090…`, 280 documents).
 
 ## Context
 
@@ -33,7 +32,7 @@ Write the **full corpus verbatim** to `localStorage`, under `abb.corpus`, plus a
 processed, go to chat" fast path on reload — and measure the real cost in the unit the browser
 actually charges before claiming it fits.
 
-Measured live (Task 41, `http://localhost:8080`, corpus `90e08090…` loaded fresh through the Data
+Measured live (`http://localhost:8080`, corpus `90e08090…` loaded fresh through the Data
 screen's file picker):
 
 | Source | Figure |
@@ -74,7 +73,7 @@ did not fire: 1.73 MB is far below that trip point, with headroom to spare.
 
 - **Manifest-plus-preview, decided before measuring.** The cautious-sounding option — never write
   the full corpus, just a manifest and a bounded preview, because "5 MB is not a lot" — was
-  available from day one and was deliberately not taken until the real number existed. Choosing it
+  available and deliberately not taken until the real number existed. Choosing it
   pre-emptively would have satisfied the localStorage requirement's letter while quietly
   under-delivering its spirit: the requirement says "store it," not "store a summary of it."
 - **Quoting the file's on-disk byte size as if it were the quota cost.** This was the actual trap:

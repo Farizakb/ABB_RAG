@@ -2,18 +2,16 @@
 
 ## Status
 
-Partially recorded. This ADR covers several related decisions named together in
-`SPEC.md` §19 (why numbers do not live only in vectors, why there is no numeric
-router, why a synthetic index is built only where ABB has not already built
-one, and why every user-facing URL is derived from a retrieved document rather
-than written by the model). The sub-decision below — the synthetic-index one —
-is settled, by measurement, as of Task 12. The others in that list are settled
-by earlier or later tasks and are not restated here to avoid claiming a
-measurement this task did not make.
+Accepted. This ADR covers several related decisions (why numbers do not live
+only in vectors, why there is no numeric router, why a synthetic index is built
+only where ABB has not already built one, and why every user-facing URL is
+derived from a retrieved document rather than written by the model). The
+synthetic-index sub-decision below is settled by measurement; the others are
+stated as design decisions without a separate measurement.
 
 ## Context
 
-`SPEC.md` §5.5 describes two kinds of synthetic document assembled at ingest
+The original design describes two kinds of synthetic document assembled at ingest
 from already-scraped field values: a bank-facts document (one
 `BankOrCreditUnion` ld+json block, taken once from the homepage) and one index
 document per "enumerable" class (active campaigns; products, one per
@@ -29,7 +27,7 @@ server-side; using their page keeps ordering and maintenance on their side,
 and — the decisive reason — makes the synthetic answer incapable of
 disagreeing with `§11.2`'s footer link, which points at that same page.
 
-Task 12 measured this directly rather than assuming `RECON`'s prediction held.
+This was measured directly rather than assumed.
 The project fetched exactly the two URLs §5.5 names — `https://abb-bank.az/kampaniyalar` and
 `https://abb-bank.az/ferdi/kreditler` — once each, through the existing
 `Fetcher` (robots.txt honoured, 1 req/s + jitter). Both responses are
@@ -37,7 +35,7 @@ committed as `backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html` and
 `backend/scraper/tests/fixtures/raw/listing-ferdi-kreditler.html`, so the measurement is
 reproducible offline and is never re-fetched. Full detail, including the
 structural check that ruled out a §5.3 chrome-stripper bug as an alternative
-explanation, is in `RECON.md`'s dated "Task 12" day-two heading.
+explanation is documented below.
 
 **Measured, not assumed:**
 
@@ -74,11 +72,9 @@ with the same name). Re-measured through
 and no `/ferdi/kampaniyalar` at all) does not reproduce against the same cached
 file: re-grepped locally (no network) and found **zero** `<loc>` entries for
 any bare `/kampaniyalar` or `/kampaniyalar/` parent under any locale, 247
-`kampaniyalar/<slug>` children (matching `RECON.md` §3's independently
-measured count exactly), and `/ferdi/kampaniyalar` present once per locale
+`kampaniyalar/<slug>` children (247 entries), and `/ferdi/kampaniyalar` present once per locale
 (3 matches) — corroborating the breadcrumb-based finding, not
-refuting it. Exact grep commands and counts are in `RECON.md`'s "Task 12" heading. This discrepancy 
-is recorded here for reference.
+refuting it. This discrepancy is recorded here for reference.
 
 **Verification with exact-match sitemap query.** A re-check of the sitemap with an exact-match query 
 confirmed the earlier re-grep: over all 7,042 `<loc>` entries, `/kampaniyalar` (bare)
@@ -114,7 +110,7 @@ Per §5.5's table (one class at/above the 0.60 threshold, one class below —
 in fact unreachable): `index_documents` is written **for the campaign class
 only**. The product branch (a `section_path`-keyed index, one per
 `ferdi`/`biznes` sub-section) was never written at all — the losing option is
-deleted before being written, per `SPEC.md` §8.3's rule, not left behind a
+deleted before being written, per the pre-committed decision rule, not left behind a
 flag or a commented-out block. `bank_facts_document` and `listing_enumerates`
 are unconditional and both exist regardless of this measurement;
 `listing_enumerates` is the measurement's own evidence function, re-checked on
@@ -130,7 +126,7 @@ with the product branch it would have exercised).
 ## Consequences
 
 - The campaign index's citation is anchored to `https://abb-bank.az/ferdi/kampaniyalar`
-  (SPEC §5.5's originally-named `/kampaniyalar` was confirmed
+  (the originally-assumed `/kampaniyalar` was confirmed
   absent from the site — two direct 404s, and 0 of 7,042 sitemap `<loc>`
   entries, even though 247 of its own children are present there), pinned
   verbatim by `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`.
@@ -147,7 +143,7 @@ with the product branch it would have exercised).
   ABB's own page already answers that question, with better ordering and
   maintenance than a synthetic copy could offer.
 - `_abb_already_enumerates` is a runtime guard, not a one-time flag: if a
-  future scrape (Task 13 onward) finds `/ferdi/kreditler` no longer names its
+  future scrape finds `/ferdi/kreditler` no longer names its
   products, or finds `/ferdi/kampaniyalar` server-rendering its campaign list
   (it is currently a client-rendered shell), `index_documents` changes its
   output automatically on the next ingest, without a code change.
