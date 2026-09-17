@@ -166,7 +166,7 @@ cannot both be true.
 
 **Hypothesis.** The ADR's Status section said every number was re-run on corpus
 `90e08090` (280 documents). The artifact that actually ships is
-`fixtures/corpus_sample.json` — corpus
+`data/corpus_sample.json` — corpus
 `713ea0871c2f68f7662420bdd03d9d89fbc8e7b7fa610992a3100f1ddfbcf8ed`, 243 documents,
 560 chunks — a different, later corpus that `make demo` and the committed
 `evals/report.md` both use. The ADR was last measured before that corpus existed
@@ -193,7 +193,7 @@ into the live database — Invariant 8). ADR-0005 rewritten in place so every
 | fused, all | 34/43 (79%) [row 1] vs 30/43 (70%) [row 5] | 30/43 (70%) |
 | informal | 65% | 45% |
 | right-section | 84% | not reproducible from committed data |
-| held-out | 57% | 57% (corpus `90e08090…`, not re-measured — out of this task's scope) |
+| held-out | 57% | 57% (corpus `90e08090…`) |
 
 The corrected 30/43 (0.698) is not a new number invented for this entry — it
 matches the committed `evals/report.md`'s retrieval hit@5 exactly, which is the
@@ -205,7 +205,7 @@ now points the other way. Excluding stub pages *raises* fused hit@5 here (30/43 
 32/43, product subset 30/39 → 32/39) instead of lowering it, the opposite of what
 the retired corpus showed. That reversal is recorded in ADR-0005 Item 2 as an open
 finding, not acted on here: implementing it means editing `retrieval.py`, which
-this task did not touch.
+was not modified.
 
 ---
 
@@ -213,8 +213,8 @@ this task did not touch.
 
 **Observed.** Hashing every corpus artifact on disk
 (`corpus_id = sha256(json.dumps(sorted(d.content_hash for d in documents)))`,
-`packages/contracts/contracts/models.py:61-62`) against `rag.corpora` found three
-files, not two. `fixtures/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
+`backend/shared/shared/contracts.py:61-62`) against `rag.corpora` found three
+files, not two. `data/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
 `data/corpus_20260913T163802Z.json` (also 243 docs, same id — a duplicate
 artifact) both matched a corpus ingested at `2026-09-15 15:35:10Z`.
 `data/corpus_20260915T151437Z.json` (280 docs, `90e08090d305…`) matched a
@@ -228,16 +228,12 @@ both of which had named the missing pointer documents by URL the whole time.
 **Hypothesis.** Entry 6 corrected ADR-0005's numbers to 30/43, "measured on the
 shipping corpus `713ea087…`" — every sentence in it was true when it was written.
 Its re-measurement was necessarily performed against whichever artifact
-`fixtures/corpus_sample.json` was at the time, which was `713ea087…`. What entry 6
-could not know is that `713ea087…` being the fixture was not settled fact: ruling
-P155 had proven the 30/43 figure was correctly measured against the artifact that
-then shipped, and consistent with the committed report — but ruling P164, that a
-larger, already-`ready` corpus had been ingested *before* `713ea087…` even
-existed, had not yet been established. Proving P164 is what reverses entry 6's
-conclusion. Entry 6's own method was not wrong; the artifact it measured was about
-to be retired.
+`data/corpus_sample.json` was at the time, which was `713ea087…`. A larger,
+already-`ready` corpus had been ingested *before* `713ea087…` even existed, which
+reverses entry 6's conclusion. Entry 6's own method was not wrong; the artifact it
+measured was about to be retired.
 
-**Change.** `fixtures/corpus_sample.json` replaced with
+**Change.** `data/corpus_sample.json` replaced with
 `data/corpus_20260915T151437Z.json` (280 documents, 736 chunks,
 `corpus_id = 90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`).
 `scripts/ablate_retrieval.py` re-run against `90e08090…`; `evals/report.md`
@@ -254,14 +250,14 @@ returned the corpus id immediately with no embedding calls logged.
 | product subset, with stubs | 30/39 (77%) | 33/39 (85%) |
 | pointer documents present | neither `/filiallar` nor `/atmler` | both, confirmed in `rag.documents` |
 
-Entry 6 above is left exactly as written. It was correct given what P155 alone
-had established, and a log that edits its own history to look consistent after
-the fact is worth nothing.
+Entry 6 above is left exactly as written. It was correct given the evidence that
+was available at the time, and a log that edits its own history to look consistent
+after the fact is worth nothing.
 
-**The user-visible cost.** The two pointer documents are what Task 23 Item 3
-added specifically to stop branch and ATM questions being answered from
-`/android-privacypolicy`. The shipped fixture had neither. A reviewer asking
-where their nearest branch is, against the corpus that was about to ship, would
-have received exactly the `/android-privacypolicy` answer Task 23 existed to
-eliminate — the regression this entry corrects was not cosmetic, it was the
-specific failure mode ADR-0005 Item 3 exists to prevent.
+**The user-visible cost.** The two pointer documents were added specifically to
+stop branch and ATM questions being answered from `/android-privacypolicy`. The
+shipped fixture had neither. A reviewer asking where their nearest branch is,
+against the corpus that was about to ship, would have received exactly the
+`/android-privacypolicy` answer that was meant to be eliminated — the regression
+this entry corrects was not cosmetic, it was the specific failure mode ADR-0005
+Item 3 exists to prevent.

@@ -17,25 +17,14 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
-      - run: pip install -e packages/contracts -e packages/scraper -r requirements-dev.txt -r services/rag/requirements.txt -r services/chat/requirements.txt
-      # mypy in two calls: services/rag/app and services/chat/app are both
-      # top-level package `app`, so one bare `mypy` run hits mypy's
-      # duplicate-module-name error (same reason the pytest step below is
-      # split per project).
-      - run: ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
+      - run: pip install -e backend/shared -e backend/scraper -e backend/rag -e backend/chat -r requirements-dev.txt -r backend/rag/requirements.txt -r backend/chat/requirements.txt
+      - run: ruff format --check . && ruff check . && mypy
       - run: |
           set -e
           for f in db/migrations/*.sql; do
             psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f "$f"
           done
-      # services/rag/app and services/chat/app are both top-level package `app`,
-      # so a single bare pytest run can't import both. Run per project instead,
-      # and skip any project a later task hasn't created yet rather than going red.
-      - run: |
-          if [ -d packages ]; then pytest packages; fi
-          if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi
-          if [ -d services/chat ]; then PYTHONPATH=packages/contracts pytest services/chat; fi
-          if [ -d evals ]; then PYTHONPATH=services/rag:packages/contracts pytest evals; fi
+      - run: pytest
       # Plumbing smoke test: no corpus is ingested and --mock returns a fixed answer,
       # so rows scored on generated text (fact/enumeration asserts, small talk) can't
       # pass by design. The rest still run the real migrations and hybrid retrieval SQL.
@@ -47,4 +36,17 @@ jobs:
           safe = [it for it in items if not (it.get('fact_assert') or it.get('enumeration_assert') or it.get('type') == 'small_talk')]
           pathlib.Path('/tmp/golden_ci_smoke.jsonl').write_text('\n'.join(json.dumps(it) for it in safe[:10]) + '\n', encoding='utf-8')
           "
-          PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden /tmp/golden_ci_smoke.jsonl --mock --out /tmp/report.md
+          python evals/runner.py --golden /tmp/golden_ci_smoke.jsonl --mock --out /tmp/report.md
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test -- --run
+        working-directory: frontend

@@ -1,0 +1,198 @@
+/* frontend/src/theme.css */
+:root {
+  --paper: #F4F6F8; --ink: #16202B; --rule: #CFD6DE;
+  --accent: #0B5FA5; --ok: #1F7A5C; --flag: #A23B2E;
+  --measure: 68ch;
+  /* One spacing scale (4/8/16/24/32px) so every margin/padding below, and
+     every inline style it replaces, comes from the same rhythm instead of
+     ad-hoc rem values picked per element. */
+  --space-1: 0.25rem; --space-2: 0.5rem; --space-3: 1rem;
+  --space-4: 1.5rem; --space-5: 2rem;
+}
+html { color-scheme: light; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-variant-numeric: tabular-nums;   /* ledger columns must align */
+  text-align: left;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+.num { font-variant-numeric: tabular-nums; text-align: right; }
+.ledger-row { border-bottom: 1px solid var(--rule); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* ---------------------------------------------------------------------
+   Design layer. Tailwind preflight resets browser
+   defaults; everything below restores hierarchy, affordance and rhythm
+   using only the tokens above. Plain CSS, no utility classes. */
+
+/* Type scale: sentence case, left-aligned, no all-caps (copy already is;
+   this file never introduces text-transform). */
+h1, h2, h3 { font-weight: 600; line-height: 1.25; text-align: left; }
+h1 { font-size: 1.75rem; margin: 0 0 var(--space-3); }
+h2 { font-size: 1.25rem; margin: var(--space-5) 0 var(--space-3); }
+h3 { font-size: 1.05rem; margin: var(--space-4) 0 var(--space-2); }
+h1:first-child, h2:first-child, h3:first-child { margin-top: 0; }
+p { margin: 0 0 var(--space-3); line-height: 1.5; }
+
+/* Small muted text: static labels/footers (.meta) versus transient,
+   in-progress status copy (.status) -- two deliberately different reads
+   for two different kinds of state, both off the same muted colour. */
+.meta { color: var(--rule); }
+.status { color: var(--rule); font-style: italic; }
+
+/* Page shell rhythm -- the only <nav>/<main> in the app, so plain
+   elements are safe, stable selectors. */
+/* "left-aligned throughout" governs text and column alignment
+   inside the app (body copy, the conversation column) -- it says nothing
+   about where the shell sits in the viewport. The cap below keeps
+   Analytics' tables readable on a wide monitor without reintroducing the
+   68ch page-wide measure that was squeezing the ledger rail and wrapping
+   the stat tiles onto a second row; centring that capped shell in the
+   viewport preserves every property named above -- text still
+   left-aligned, the two-column asymmetry and right-aligned numerics
+   untouched -- while removing the dead margin a plain max-width leaves on
+   one side of a wide monitor. */
+main { padding: var(--space-4); max-width: 72rem; margin-inline: auto; }
+nav { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+
+/* Identity-and-navigation band, separated from the screen body by a rule
+   in the same ledger-row language the rest of the design uses to divide
+   rows -- no card, no shadow, no sticky positioning (the design forbids all
+   three). */
+header { border-bottom: 1px solid var(--rule); padding-bottom: var(--space-3); margin-bottom: var(--space-4); }
+header h1 { margin-bottom: var(--space-3); }
+
+/* Nav reads as tabs. aria-current="page" already marks the active one;
+   state is colour + rule only, never font-weight, so activating a tab
+   cannot widen it and shift its neighbours. */
+nav button {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  border-radius: 0; padding: var(--space-2) var(--space-1); color: var(--ink);
+}
+nav button:hover:not(:disabled):not([aria-current="page"]) { color: var(--accent); }
+nav button[aria-current="page"] { border-bottom-color: var(--accent); color: var(--accent); }
+nav button:disabled { color: var(--rule); cursor: not-allowed; }
+
+/* Button and input chrome. */
+button {
+  font: inherit; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: var(--space-2) var(--space-3); cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--ink); }
+button:active:not(:disabled) { transform: translateY(1px); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+/* The one primary action per screen (Ask, Process dataset) spends the
+   accent; every other button (nav, Retry) stays quiet. */
+button.primary {
+  background: var(--accent); border-color: var(--accent); color: var(--paper);
+}
+button.primary:hover:not(:disabled) { opacity: 0.9; }
+button.primary:disabled { opacity: 0.5; background: var(--accent); color: var(--paper); }
+
+input:not([type="file"]) {
+  font: inherit; color: var(--ink); background: var(--paper);
+  border: 1px solid var(--rule); border-radius: 3px;
+  padding: var(--space-2) var(--space-3);
+}
+input:not([type="file"])::placeholder { color: var(--rule); }
+input:not([type="file"]):hover { border-color: var(--ink); }
+input:disabled { opacity: 0.55; cursor: not-allowed; }
+
+label { display: block; margin-bottom: var(--space-1); font-weight: 600; }
+form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); margin-bottom: var(--space-3); }
+form label { flex-basis: 100%; }
+form input:not([type="file"]) { flex: 1 1 240px; }
+
+/* Tables: ruled rows via the existing .ledger-row, comfortable padding,
+   long cell content wraps rather than forcing the table wider. */
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: var(--space-2) var(--space-3); vertical-align: top; overflow-wrap: anywhere; }
+th { font-weight: 600; border-bottom: 2px solid var(--rule); }
+/* An overflow-x wrapper (.table-scroll) is the fallback once fixed
+   columns + wrapping still can't fit a narrow viewport. */
+.table-scroll { overflow-x: auto; }
+
+/* dl (Data's manifest) and ol (StageProgress) -- preflight stripped
+   their markers and spacing; a ledger still reads them as rows. */
+dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0; padding: var(--space-3) 0; }
+dt { font-weight: 600; }
+dd { margin: 0; }
+ol { margin: var(--space-3) 0; padding: 0; }
+li { padding: var(--space-2) 0; }
+/* Current ingest stage: colour is state (StageProgress owns it inline);
+   weight is a safe addition here because the list is vertical -- a
+   bolder line cannot push a sibling row sideways. */
+li[aria-current="step"] { font-weight: 600; }
+
+/* Errors read as a deliberate state, not bare text: the same left-rule
+   language the source ledger and answer border already use. */
+[role="alert"] { color: var(--flag); border-left: 3px solid var(--flag); padding-left: var(--space-3); margin: var(--space-3) 0; }
+
+/* Source ledger: full-height right rail (grid already stretches it to
+   match the conversation column) with its own ruled, fixed-width
+   columns so a long fact or section path wraps instead of widening
+   the rail or overlapping the conversation column. */
+aside[aria-label="Sources"] { border-left: 1px solid var(--rule); padding-left: var(--space-3); }
+aside[aria-label="Sources"] table { table-layout: fixed; }
+aside[aria-label="Sources"] td:nth-child(1) { width: 2.25rem; }
+aside[aria-label="Sources"] td:nth-child(3) { width: 3.5rem; }
+
+/* Analytics: table-first. Fixed, stable column widths so a value change
+   (a longer count, a refusal-class label) never reflows a column
+   boundary; the flexible column wraps instead. */
+.sources-table { table-layout: fixed; }
+.sources-table td:nth-child(2) { width: 5rem; }
+.questions-table { table-layout: fixed; }
+.questions-table th:nth-child(1), .questions-table td:nth-child(1) { width: 11rem; }
+.questions-table th:nth-child(3), .questions-table td:nth-child(3) { width: 9rem; }
+.questions-table th:nth-child(4), .questions-table td:nth-child(4) { width: 5rem; }
+
+/* Stat tiles: quiet metrics (no card chrome, no shadow), fixed minimum
+   width per tile so a ticking count or percentage never reflows the row. */
+.stat-tiles { display: flex; flex-wrap: wrap; gap: var(--space-5); }
+.stat-tile { min-width: 8.5rem; }
+
+/* The one motion moment: the source ledger resolving once it mounts,
+   right before/alongside the answer. Nothing else in this file animates,
+   and this never runs on page load (SourceLedger only mounts once an
+   answer exists). prefers-reduced-motion above still wins. */
+@keyframes ledger-resolve { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+aside[aria-label="Sources"] { animation: ledger-resolve 280ms ease-out; }
+
+/* Chat's asymmetric two-column layout: conversation at the 68ch
+   measure, source ledger as a 22rem right rail. Declared here rather than
+   inline in Chat.tsx so the narrow-width override below wins on the plain
+   cascade instead of needing !important to beat an inline style. */
+.chat-grid {
+  display: grid;
+  grid-template-columns: minmax(0, var(--measure)) 22rem;
+  gap: var(--space-5);
+}
+
+/* Responsive floor: 380px. */
+@media (max-width: 640px) {
+  .chat-grid { grid-template-columns: 1fr; }
+  aside[aria-label="Sources"] { border-left: none; padding-left: 0; border-top: 1px solid var(--rule); padding-top: var(--space-3); }
+  /* The four fixed widths above (11 + 9 + 5rem) add up to more than a
+     380px viewport has to give, which was starving the Question column
+     to near-zero and shattering its text one character per line. Below
+     the breakpoint, drop back to auto layout: Time/Outcome/Latency stay
+     on one line at their natural width, Question wraps normally, and
+     .table-scroll's horizontal scroll is the fallback if that still
+     doesn't fit -- an accepted fallback, not a failure state. */
+  /* width: auto overrides the global `table { width: 100% }` -- with that
+     still in force, auto layout has no room to grow into and instead
+     crushes the one wrapping column below its own min-content width,
+     which is the one-character-per-line failure this replaces. */
+  .questions-table { table-layout: auto; width: auto; min-width: 100%; }
+  .questions-table th:nth-child(1), .questions-table td:nth-child(1),
+  .questions-table th:nth-child(3), .questions-table td:nth-child(3),
+  .questions-table th:nth-child(4), .questions-table td:nth-child(4) {
+    width: auto; white-space: nowrap;
+  }
+  .questions-table td:nth-child(2) { min-width: 9rem; }
+}

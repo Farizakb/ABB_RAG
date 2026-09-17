@@ -1,45 +1,41 @@
 # scripts/verify_gate.py
-"""SPEC.md §2 verification gate. Run once, on day one, before any parser exists.
+"""Verification gate. Run once, before any parser exists.
 
-Writes fixtures/raw/*.html and prints a report to paste into RECON.md.
+Writes backend/scraper/tests/fixtures/raw/*.html and prints a plain-text
+verification report to stdout.
 
-Deviations from the original brief, per task-1 decisions:
-- Captures all 8 fixtures named in the task brief's Interfaces section
-  (adds kampaniya-active and stub-empty to the brief's 6-entry PAGES dict).
+Notes:
+- Captures 8 fixtures total: the 6 fixed pages in `FIXED_PAGES`, plus
+  kampaniya-active and stub-empty for edge-case coverage.
 - V-4 (localStorage quota) is a human browser step; this script only prints
   the JS snippet to paste into a console.
 - robots.txt is checked here in Python (identifying UA, one request) instead
   of via a separate curl step.
-
-Fix round 1 (all inside SPEC §2's remit):
 - F1: fetches one real sub-page per biznes segment (one hop below each hub,
   discovered from the hub fixture's own hrefs already on disk) and reports
-  the two signals that decide Task 7's shape: a bullet-separated breadcrumb
+  the two signals that decide the extraction shape: a bullet-separated breadcrumb
   and a rendered value-then-label stat block, both checked in visible text
   (script/style/tags stripped) rather than raw HTML, so JSON-payload false
   positives don't count.
-- F2: V-5's "within 12 months" check is now a true rolling 365-day window
+- F2: V-5's "within 12 months" check is a true rolling 365-day window
   (`lastmod >= today - 365d`), not a coarse calendar-year-prefix match.
 - F3: loads OPENAI_API_KEY from .env into the process environment (value
   never printed/logged) and runs the real V-2 model/embedding/structured-
   output probe.
 - F4: greps the already-captured fixtures for cdn.abb-bank.az PDF links and
-  probes any found instead of the previous inconclusive CDN root request.
-
-Fix round 2:
-- R1: every sleep is now jittered (`1.0 + random.uniform(0, 0.3)`), matching
-  SPEC §5.1's "one request per second with jitter" and the shape Task 6's
-  real Fetcher will use.
-- R2: robots.txt is now enforced, not just parsed and printed. `fetch()` is
-  gated by a `urllib.robotparser.RobotFileParser` built from the fetched
-  robots.txt; a disallowed URL is skipped (no request made) with a printed
-  line, rather than fetched anyway or silently dropped. This matters because
+  probes any found instead of an inconclusive CDN root request.
+- Every sleep is jittered (`1.0 + random.uniform(0, 0.3)`), matching a
+  one-request-per-second-with-jitter politeness policy.
+- robots.txt is enforced, not just parsed and printed. `fetch()` is gated by
+  a `urllib.robotparser.RobotFileParser` built from the fetched robots.txt; a
+  disallowed URL is skipped (no request made) with a printed line, rather
+  than fetched anyway or silently dropped. This matters because
   `pick_kampaniya_active()` and `first_sub_page_path()` derive URLs
   dynamically. (The CDN PDF probe targets a different host, cdn.abb-bank.az,
   so it is not gated by abb-bank.az's robots.txt.)
-- R3: dependencies are now pinned in requirements-dev.txt at the repo root.
-- R4: the CDN PDF probe uses client.stream() and reads only the first chunk,
-  so a server that ignores the Range header still only costs ~2 KB, not the
+- Dependencies are pinned in requirements-dev.txt at the repo root.
+- The CDN PDF probe uses client.stream() and reads only the first chunk, so
+  a server that ignores the Range header still only costs ~2 KB, not the
   whole file.
 
 The whole script stays idempotent: fixtures already on disk are not
@@ -61,10 +57,10 @@ import httpx
 
 UA = "ABB-Assistant-CaseStudy/1.0 (+farizakb090@gmail.com)"
 HOST = "https://abb-bank.az"
-RAW = pathlib.Path("fixtures/raw")
+RAW = pathlib.Path("backend/scraper/tests/fixtures/raw")
 ENV_FILE = pathlib.Path(".env")
 
-# The 6 fixed-path fixtures from the brief's PAGES dict.
+# The 6 fixed-path fixtures.
 FIXED_PAGES = {
     "nagd-kredit": "/ferdi/kreditler/nagd-kredit",
     "biznes-kicik-orta": "/biznes/kicik-ve-orta-biznes",
@@ -73,10 +69,9 @@ FIXED_PAGES = {
     "haqqimizda": "/haqqimizda",
     "homepage": "/",
 }
-# Decision: stub-empty is the client-rendered shell RECON §7 flagged.
+# stub-empty is a client-rendered shell with no server-side content.
 STUB_EMPTY_PATH = "/filiallar"
-# Interface-listing order for the printed report (not functionally required,
-# just matches fixtures/raw/*.html filenames as named in the task brief).
+# Printed-report ordering only, matches the fixture filenames above.
 REPORT_ORDER = [
     "nagd-kredit",
     "biznes-kicik-orta",
@@ -102,7 +97,7 @@ PDF_URL_RE = re.compile(r"https://cdn\.abb-bank\.az/[A-Za-z0-9_./%-]+\.pdf")
 
 
 def _polite_sleep() -> None:
-    """R1: one request per second, with jitter, everywhere the script sleeps."""
+    """One request per second, with jitter, everywhere the script sleeps."""
     time.sleep(1.0 + random.uniform(0, 0.3))
 
 
@@ -128,7 +123,7 @@ def fetch(
     rp: urllib.robotparser.RobotFileParser,
     host: str = HOST,
 ) -> httpx.Response | None:
-    """R1 + R2: jittered 1 req/s sleep, gated by robots.txt. Returns None
+    """Jittered 1 req/s sleep, gated by robots.txt. Returns None
     (no request made) if `rp` disallows the URL for our UA."""
     url = host + path
     if not rp.can_fetch(UA, url):
@@ -140,7 +135,7 @@ def fetch(
 def load_or_fetch(
     client: httpx.Client, name: str, path: str, rp: urllib.robotparser.RobotFileParser
 ) -> tuple[str | None, str]:
-    """Idempotent fixture fetch: reuse fixtures/raw/<name>.html if it's
+    """Idempotent fixture fetch: reuse RAW/<name>.html if it's
     already on disk instead of re-fetching, so re-running the gate doesn't
     re-hit pages it already has. Returns (None, status) if robots.txt
     disallows the path and nothing is on disk yet."""
@@ -194,10 +189,10 @@ def find_cdn_pdf_urls() -> list[str]:
 def check_robots(
     client: httpx.Client,
 ) -> tuple[list[str], urllib.robotparser.RobotFileParser]:
-    """Step 2, done in Python per decision #4: fetch robots.txt (the one
-    request nothing else can be gated behind), report Crawl-delay presence
-    and Disallow paths for the printed table, and build the
-    RobotFileParser (R2) used to gate every later request in this run."""
+    """Step 2, done in Python: fetch robots.txt (the one request nothing
+    else can be gated behind), report Crawl-delay presence and Disallow
+    paths for the printed table, and build the RobotFileParser used to gate
+    every later request in this run."""
     _polite_sleep()
     r = client.get(HOST + "/robots.txt", follow_redirects=True)
     text = r.text
@@ -244,7 +239,7 @@ def pick_kampaniya_active(
     camp_sorted: list[str],
     rp: urllib.robotparser.RobotFileParser,
 ) -> tuple[str | None, str | None, list[str]]:
-    """Decision #1: pick the kampaniyalar/** URL with the most recent sitemap
+    """Pick the kampaniyalar/** URL with the most recent sitemap
     lastmod, confirm its body carries a DD.MM.YYYY - DD.MM.YYYY range whose
     end date is in the future. Falls back to the most recent one if none of
     the probed candidates qualify. A candidate disallowed by robots.txt is
@@ -464,7 +459,7 @@ def main() -> int:
             )
             for url in pdf_urls[:2]:
                 _polite_sleep()
-                # R4: stream and read only the first chunk, so a CDN that
+                # Stream and read only the first chunk, so a CDN that
                 # ignores Range still costs ~2 KB, not the whole file.
                 with client.stream(
                     "GET", url, headers={"Range": "bytes=0-2047"}, timeout=15.0

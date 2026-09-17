@@ -7,7 +7,7 @@ it.
 
 ## Context
 
-The brief asks for extracted data "formatted into a suitable vector database format," framework
+The requirement is extracted data "formatted into a suitable vector database format," framework
 of choice. At the corpus size this build actually ships — 280 documents, 736 chunks — the choice
 of vector store has no measurable effect on retrieval quality or latency; what it affects is
 operational surface area: how many systems exist, how many connection strings, credentials and

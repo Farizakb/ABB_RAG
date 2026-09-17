@@ -44,7 +44,7 @@ def score_item(
         if item.get("refusal_class"):
             refusal_correct = refused and refusal_class == item["refusal_class"]
 
-    # Task 42, ruling 6: a small_talk item passes iff it was answered (not
+    # A small_talk item passes iff it was answered (not
     # refused) and carried no sources -- it is neither grounded nor a
     # refusal, so it gets its own pass/fail shape instead of borrowing
     # must_refuse's or an answerable item's.
@@ -52,7 +52,7 @@ def score_item(
     if item.get("type") == "small_talk":
         small_talk_ok = (not refused) and not urls
 
-    # Fix round 1, F2: an adversarial item (a real product question dressed
+    # An adversarial item (a real product question dressed
     # up as small talk, or asking the model to treat it as small talk) passes
     # iff the guard held -- it was NOT answered as an uncited small-talk
     # reply. Either a refusal or a properly grounded-and-cited answer counts
@@ -78,8 +78,8 @@ def score_item(
             for f in facts
         ) and str(int(fa["value_num"])) in answer.replace(" ", "").replace(" ", "")
 
-    # SPEC §8.1. Which assertion applies is decided by §5.5's day-two measurement,
-    # read from the corpus by the caller rather than configured here, so an item
+    # Which assertion applies is decided by a measurement of the corpus,
+    # read from it by the caller rather than configured here, so an item
     # can never silently assert the shape the build did not take.
     enumeration_ok: bool | None = None
     if ea := item.get("enumeration_assert"):
@@ -110,8 +110,7 @@ def score_item(
         # Generic, not type-scoped: only meaningful when grounded, so a
         # small_talk_adversarial item that resolves as a genuine grounded
         # bank_question answer is included here same as any answerable item,
-        # and one that refuses is excluded -- fix round 1, F2's "exclude from
-        # grounded/citation metrics only if they refuse".
+        # and one that refuses is excluded from grounded/citation metrics.
         "citation_present": bool(sources) if grounded else None,
         "refusal_correct": refusal_correct,
         "include_ok": include_ok,
@@ -135,7 +134,7 @@ WHERE r.content_hash = %s
 
 
 def enumeration_context(corpus_id: str, item: dict[str, Any]) -> tuple[list[str], bool]:
-    """Read which §5.5 branch the build actually took, and the class's real members.
+    """Read which synthetic-index branch the build actually took, and the class's real members.
 
     `index_exists` is per class, not global: a synthetic campaign index can exist
     while ABB's own `/ferdi/kreditler` page won for products. An index document is
@@ -146,7 +145,7 @@ def enumeration_context(corpus_id: str, item: dict[str, Any]) -> tuple[list[str]
     be more code than it saves."""
     ea = item.get("enumeration_assert") or {}
     listing = (ea.get("if_no_index") or {}).get("must_carry_listing_url", "")
-    from app.db import get_conn
+    from rag.db import get_conn
 
     with get_conn() as conn:
         rows = conn.execute(ENUM_CONTEXT_SQL, (corpus_id,)).fetchall()
@@ -192,7 +191,7 @@ class Report:
     def _latency_budget_row(self, label: str, lat: dict[str, float], threshold: float) -> str:
         """Both statistics, each with its own verdict, so a forgiving median
         can never be published as the sole result directly above p95 data
-        that fails it -- SPEC §20 treats that as a quietly averaged-away miss."""
+        that fails it -- otherwise that reads as a quietly averaged-away miss."""
         median_status = "PASS" if lat["median"] < threshold else "MISS"
         p95_status = "PASS" if lat["p95"] < threshold else "MISS"
         return (
@@ -234,7 +233,7 @@ class Report:
         lines = [
             "# Eval report",
             "",
-            f"**Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, "
+            f"**Headline: wrong-answer rate on out_of_scope + advisory, "
             f"{len(wrong_refusal)}/{len(refusal_set)}.** Abstention beats guessing.",
             "",
             f"Wrong-answer rate, all {len(self.rows)} items: {len(wrong)}/{len(self.rows)}.",
@@ -261,7 +260,7 @@ class Report:
             f"| generation | {generation_lat['median']} | {generation_lat['p95']} | "
             f"{generation_lat['max']} |",
             "",
-            "## Budgets (SPEC §8.4 Global Constraints)",
+            "## Budgets",
             "",
             "### Latency",
             "",
@@ -342,9 +341,9 @@ def main() -> int:
         print(report.markdown(data["config"]))
         return report.exit_code()
 
-    from app.config import settings
-    from app.embedder import FakeEmbedder, OpenAIEmbedder
-    from app.generate import OpenAIClient, answer
+    from rag.config import settings
+    from rag.embedder import FakeEmbedder, OpenAIEmbedder
+    from rag.generate import OpenAIClient, answer
 
     # dim=settings.embedding_dim, not a hardcoded 8: a real corpus (ingested by
     # `make demo`/`make ingest`) is embedded at EMBEDDING_DIM (1536 by

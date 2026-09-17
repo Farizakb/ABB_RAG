@@ -1,4 +1,4 @@
--- Task 23 item 1: the lexical half of hybrid retrieval.
+-- The lexical half of hybrid retrieval.
 --
 -- Azerbaijani has no Postgres text-search dictionary, so there is no stemming to
 -- lean on. Two substitutes carry it instead: `:*` prefix terms in the tsquery

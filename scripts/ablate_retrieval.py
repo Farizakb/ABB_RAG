@@ -3,7 +3,7 @@
 
 Generation-free by design -- these are pure retrieval questions, so embedding
 43 short queries costs a fraction of a cent and needs no LLM call. Reuses the
-exact legs, fusion constant and helpers `services/rag/app/retrieval.py` ships
+exact legs, fusion constant and helpers `backend/rag/rag/retrieval.py` ships
 with (`DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`, `_tsquery`, `_fold`,
 `RANK_DEPTH`) -- imported, never modified, so this script cannot silently
 diverge from what production actually runs. Item 2's stub-exclusion variants
@@ -11,7 +11,7 @@ are separate SQL strings defined here, because production never excludes
 stubs (that is the ADR's own verdict) -- this file is the only place that
 losing option is written down, and only long enough to be measured.
 
-The host cannot reach Postgres (ruling P132), so this runs inside the `rag`
+The host cannot reach Postgres, so this runs inside the `rag`
 container, the same way the `eval` target in Makefile already does:
 
     docker compose cp scripts/ablate_retrieval.py rag:/tmp/ablate_retrieval.py
@@ -30,10 +30,10 @@ import json
 import pathlib
 from typing import Any
 
-from app.config import settings
-from app.db import get_conn
-from app.embedder import OpenAIEmbedder
-from app.retrieval import (
+from rag.config import settings
+from rag.db import get_conn
+from rag.embedder import OpenAIEmbedder
+from rag.retrieval import (
     DENSE_DOCS,
     FOLD_FROM,
     FOLD_TO,
@@ -130,7 +130,7 @@ def hit(
     isolation.
 
     Fused call sites pass `dense_scores` because production
-    (`services/rag/app/retrieval.py:203-213`) walks the fused order and keeps
+    (`backend/rag/rag/retrieval.py:203-213`) walks the fused order and keeps
     only documents that carry a proven dense-leg score at or above
     `settings.retrieval_floor`, discarding the rest, before taking the top
     k_prompt. A document the lexical legs alone would rank top-5 but that

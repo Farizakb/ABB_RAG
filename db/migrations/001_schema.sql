@@ -9,9 +9,9 @@ CREATE TABLE rag.corpora (
   embedding_model text NOT NULL, embedding_version int,
   status text NOT NULL, stage text, error text,
   created_at timestamptz DEFAULT now(), updated_at timestamptz DEFAULT now(),
-  -- SPEC §7.2's idempotency key is (content_hash, embedding_model), not
-  -- content_hash alone (P65): re-ingesting the same corpus under a second
-  -- embedding model is a legitimate, required state (Invariant 8 -- never
+  -- The idempotency key is (content_hash, embedding_model), not
+  -- content_hash alone: re-ingesting the same corpus under a second
+  -- embedding model is a legitimate, required state (never
   -- silently mix vector spaces from two models in one index), so the same
   -- content_hash must be allowed to appear once per model. A column-level
   -- UNIQUE on content_hash cannot express that; embedding_model must also be

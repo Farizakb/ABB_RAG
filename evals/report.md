@@ -1,6 +1,6 @@
 # Eval report
 
-**Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, 0/12.** Abstention beats guessing.
+**Headline: wrong-answer rate on out_of_scope + advisory, 0/12.** Abstention beats guessing.
 
 Wrong-answer rate, all 64 items: 7/64.
 
@@ -24,7 +24,7 @@ Wrong-answer rate, all 64 items: 7/64.
 | retrieval | 273.5 | 521.9 | 2823.0 |
 | generation | 2672.5 | 6268.0 | 12020.0 |
 
-## Budgets (SPEC §8.4 Global Constraints)
+## Budgets
 
 ### Latency
 
