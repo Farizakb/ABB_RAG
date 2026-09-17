@@ -71,7 +71,7 @@ seeded history — no empty charts.
 package under its own name (`shared`, `abb_scraper`, `rag`, `chat`), so `pytest` and `mypy` each run
 once for the whole repo instead of per project.
 
-**264 tests, all green:** `backend/shared`+`backend/scraper` 120, `backend/rag` 82, `backend/chat` 31, `evals` 23,
+**261 tests, all green:** `backend/shared`+`backend/scraper` 120, `backend/rag` 83, `backend/chat` 31, `evals` 23,
 `frontend` (Vitest) 4. `ruff format`/`ruff check` and `mypy` clean. `make eval` calls
 the live OpenAI API and costs real money — do not re-run it casually; `evals/report.md` and
 `evals/rows.json` are already committed from the last real run.

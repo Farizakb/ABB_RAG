@@ -1,34 +1,26 @@
-# --- Planning and process. Internal to Fariz, not part of the ABB deliverable. ---
-# Untracked, not deleted: the fresh implementation session still reads these off disk.
+# --- Local notes and tooling scratch ---
 archive/
 docs/superpowers/
+.superpowers/
+.claude/
 INDEX.md
 SPEC.md
 SPEC_v*.md
 RECON.md
 CUT_LIST.md
+ai_seen_prompt.md
+converstation.md
 *.docx
-
-# NOTE: docs/ itself is deliberately NOT ignored. docs/adr/ and
-# docs/error-analysis.md are deliverables and must ship.
-
-# Subagent-driven-development scratch: ledger, briefs, reports, review packages.
-.superpowers/
 
 # --- Secrets ---
 .env
 .env.*
 !.env.example
 
-# --- Crawl cache: regenerable, large, and ABB's content. Never committed. ---
+# --- Crawl output: regenerable and large. Only the sample corpus is tracked,
+# so the app runs without crawling the live site. ---
 data/
 !data/corpus_sample.json
-!data/corpus_three_page.json
-
-# NOTE: backend/scraper/tests/fixtures/raw/*.html are the gate-captured pages every
-# extraction test asserts against, tracked despite living under a test tree.
-# data/corpus_sample.json is what lets a reviewer run the app without crawling
-# ABB's production site.
 
 # --- Python ---
 __pycache__/
