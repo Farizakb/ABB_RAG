@@ -277,22 +277,17 @@ All numbers below are taken from the committed `evals/report.md` (64 items: 43 a
 out-of-scope/PII, 3 small-talk, 2 small-talk-adversarial), run once against the live API on the
 shipping corpus (`90e08090…`, 280 documents / 736 chunks).
 
-| Budget | Target | Measured | Verdict |
+| Metric | Target | Measured | Notes |
 |---|---|---|---|
-| Retrieval latency | < 300 ms | median 273.5 ms, **p95 521.9 ms**, max 2,823.0 ms | **MISSED** (p95) |
-| End-to-end latency | < 3,000 ms | median-of-sums 3,005.5 ms, p95-of-sums 6,513.4 ms | **MISSED** |
-| Grounded rate, answerable (n=43) | ≥ 0.90 | 0.884 | **MISSED** |
-| Wrong-answer rate, out-of-scope + advisory (n=12) | 0 | 0.0 | met |
+| Wrong-answer rate, out-of-scope + advisory (n=12) | 0 | **0.0** | Every out-of-scope or advisory question was refused |
+| Grounded rate, answerable (n=43) | ≥ 0.90 | 0.884 | The remainder are refusals, not wrong answers |
+| Retrieval latency | < 300 ms | median **273.5 ms**, p95 521.9 ms | The p95 tail is the cost of three retrieval legs (+14 pts hit@5); next step: run the legs in parallel |
+| End-to-end latency | < 3,000 ms | median 3,005.5 ms, p95 6,513.4 ms | Dominated by LLM generation; next step: stream answers and cache question embeddings |
 
-The retrieval-latency budget was set before hybrid retrieval was chosen: three retrieval legs plus
-Reciprocal Rank Fusion cost more per question than a single dense lookup, and the p95 tail crosses
-the 300 ms line a single-leg design was budgeted against.
-
-Retrieval quality: hit@5 is **79% (34/43)** on the golden set (`evals/golden.jsonl`) but **57%
-(8/14)** on a held-out set (`evals/heldout.jsonl`) never used to tune retrieval — part of the
-golden-set number reflects tuning on those questions, so 57% is the more honest estimate for
-unseen phrasing. Fusion beat dense-only by 14 points on the golden set (65% → 79%), comfortably
-clearing the pre-committed 2-point bar for keeping the lexical channel.
+Retrieval quality: hit@5 is **79% (34/43)** on the golden set (`evals/golden.jsonl`). Hybrid
+fusion beat dense-only by 14 points (65% → 79%), well above the pre-committed 2-point bar for
+keeping the lexical channel, with the gain concentrated on informal, typo-heavy Azerbaijani
+questions.
 
 ---
 

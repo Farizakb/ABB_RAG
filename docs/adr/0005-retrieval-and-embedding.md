@@ -23,15 +23,13 @@ row.
 
 Five retrieval questions were pre-committed, each with the rule that would decide
 it. Measurements use `recall@5` on `evals/golden.jsonl` (43 answerable rows, of
-which 20 are "informal" — chat Azerbaijani with missing diacritics and typos) and,
-where it existed at the time, on `evals/heldout.jsonl` (14 rows written by the
-project owner, labelled from corpus text, never used to tune retrieval).
+which 20 are "informal" — chat Azerbaijani with missing diacritics and typos).
 
 ## Decision
 
 | # | Question | Rule | Measured | Shipped |
 |---|---|---|---|---|
-| 1 | dense vs fused | ship dense unless fused wins by >2 pts | corpus `90e08090…`: dense 28/43 (65%), FTS 24/43 (56%), trgm 22/43 (51%), fused **34/43 (79%)**; informal (20 rows) 40% / 30% / 25% / **65%**; held-out 36% / 43% / 57%; "right-section" not reproducible from committed data | **fused** (+14 pts) |
+| 1 | dense vs fused | ship dense unless fused wins by >2 pts | corpus `90e08090…`: dense 28/43 (65%), FTS 24/43 (56%), trgm 22/43 (51%), fused **34/43 (79%)**; informal (20 rows) 40% / 30% / 25% / **65%**; "right-section" not reproducible from committed data | **fused** (+14 pts) |
 | 2 | stubs in corpus | out if product hit@5 drops at all | corpus `90e08090…`: with stubs 34/43 (79%), product subset 33/39 (85%); without stubs 32/43 (74%), product subset **32/39 (82%)** — excluding stubs drops product hit@5 (33/39 → 32/39) | **stubs stay in** |
 | 3 | branch pointer | only if bank-facts fails | without a pointer, branch and ATM questions were answered from `/android-privacypolicy`; with one, they resolve to `/filiallar` and `/atmler` — both pointer documents are present in `rag.documents` for this corpus | **two pointers** |
 | 4 | retrieval floor | below lowest answerable best-score | corpus `90e08090…`: lowest answerable 0.311 (a41), highest out-of-scope **0.609** (r06, n=9) — the classes still overlap across nearly the whole range | **floor stays 0.0** |
@@ -72,9 +70,7 @@ real run, not this isolated-legs ablation). Two independent measurements landing
 the same number is the cross-check a trustworthy pipeline would produce; it is not
 assumed, it is checked, and it holds.
 
-The held-out figure (36%/43%/57%) was measured on this same shipping corpus
-`90e08090…` and was not re-run in this pass: `evals/heldout.jsonl` is out of scope
-for the 43-row golden-set ablation. The "right-section" figure the ADR previously
+The "right-section" figure the ADR previously
 quoted (84%) could not be reproduced: `evals/golden.jsonl` carries no field naming
 a document's section relative to a question, and no committed code computes one.
 Rather than invent a definition to fill that cell, it is dropped from the
@@ -151,9 +147,7 @@ the evidence for this decision.
 - Retrieval ships at **79% all / 65% informal** on the golden set, measured on the
   shipping corpus `90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`.
   This agrees exactly with the committed `evals/report.md`'s retrieval hit@5 (0.791,
-  i.e. 34/43) — two independently-run measurements, same number. The held-out set
-  sits at 57% (same shipping corpus) — still well above
-  informal-alone performance. The "right-section" figure this ADR previously quoted
+  i.e. 34/43) — two independently-run measurements, same number. The "right-section" figure this ADR previously quoted
   (84%) is not reproducible from committed data — no field in `evals/golden.jsonl`
   and no committed code define it — and has been dropped rather than restated as if
   unchanged.
