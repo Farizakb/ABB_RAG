@@ -23,7 +23,11 @@ jobs:
       # duplicate-module-name error (same reason the pytest step below is
       # split per project).
       - run: ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
-      - run: psql "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f db/migrations/001_schema.sql
+      - run: |
+          set -e
+          for f in db/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f "$f"
+          done
       # services/rag/app and services/chat/app are both top-level package `app`,
       # so a single bare pytest run can't import both. Run per project instead,
       # and skip any project a later task hasn't created yet rather than going red.
