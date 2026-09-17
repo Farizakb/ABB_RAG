@@ -37,7 +37,7 @@ brief's own wording and says where it is covered and how that was verified this 
 
 **Evaluation criteria** (the docx's own grading axes): Functionality → `evals/report.md` and the
 [measured budgets](#measured-numbers-against-every-budget-including-the-misses) below; Code
-Quality → `ruff`/`mypy` clean, [260 tests](#run-path) green; Efficiency → the
+Quality → `ruff`/`mypy` clean, [264 tests](#run-path) green; Efficiency → the
 same latency/cost budgets, disclosed misses included; Design → §11.4's ledger-style direction
 (palette, tabular numerals, one animation); Documentation → this file plus six ADRs plus
 `docs/error-analysis.md`.
@@ -86,18 +86,14 @@ this repository.**
 
 ## Prerequisites
 
-- Docker and Docker Compose (the whole stack — Postgres, `rag`, `chat`, `web` — runs in
-  containers; nothing needs a local Python or Node install to run the app).
+- Docker and Docker Compose (Postgres, `rag`, `chat`, `web` all run in containers).
 - An OpenAI API key (see above).
-- To run the scraper, tests, or scripts directly on the host: Python 3.12 and Node 20, matching
-  the versions pinned in the service Dockerfiles.
-- **Windows reviewers:** `make` is not installed by default on a bare Windows host and none of
-  the targets below will run as `make <target>` without it. Install it (Git Bash ships with most
-  Unix tools but not `make` itself; `winget install ezwinports.make` or WSL both work), or run the
-  raw `docker compose` / shell commands given under each section below — every `make` target in
-  this README also has its literal command spelled out. This was confirmed by actually running
-  every target's underlying command line by line on Windows 11 / PowerShell 5.1 with Git Bash,
-  not assumed (Task 41).
+- For `make demo`/`eval` and the tests: Python 3.12 with `httpx` (`pip install httpx` is enough for
+  loading the corpus), and Node 20 for the web tests. **Docker only?** Run `docker compose up -d
+  --build --wait`, open `http://localhost:8080`, and drop `fixtures/corpus_sample.json` on the Data
+  screen (Analytics then starts empty instead of seeded).
+- **Windows:** `make` isn't installed by default (`winget install ezwinports.make` or WSL); every
+  target below also has its raw command.
 
 ---
 
@@ -126,7 +122,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Step | `make` | Raw command (no `make`) |
 |---|---|---|
 | Setup | `make setup` | `cp .env.example .env` (then edit `OPENAI_API_KEY`) |
-| Start the stack | `make up` | `docker compose up -d --build` |
+| Start the stack | `make up` | `docker compose up -d --build --wait` |
 | Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
 | Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
 | Run tests | `make test` | `pytest packages`; `PYTHONPATH=packages/contracts pytest services/rag`; `PYTHONPATH=packages/contracts pytest services/chat`; `PYTHONPATH=services/rag:packages/contracts pytest evals`; `cd apps/web && npm test -- --run` |
@@ -157,7 +153,7 @@ pgAdmin's connection dialog.
 `test`/`lint` run per project rather than once for the whole repo — a single bare `pytest`/`mypy`
 invocation hits a duplicate-module-name error across the two.
 
-**260 tests, all green:** `packages` 120, `services/rag` 82, `services/chat` 27, `evals` 23,
+**264 tests, all green:** `packages` 120, `services/rag` 82, `services/chat` 31, `evals` 23,
 `apps/web` (Vitest) 4. `ruff format`/`ruff check` and both `mypy` calls clean. `make eval` calls
 the live OpenAI API and costs real money — do not re-run it casually; `evals/report.md` and
 `evals/rows.json` are already committed from the last real run.

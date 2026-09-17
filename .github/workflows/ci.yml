@@ -36,17 +36,9 @@ jobs:
           if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi
           if [ -d services/chat ]; then PYTHONPATH=packages/contracts pytest services/chat; fi
           if [ -d evals ]; then PYTHONPATH=services/rag:packages/contracts pytest evals; fi
-      # This step never ingests a corpus and --mock's client always returns a
-      # fixed, contentless answer (see evals/runner.py's `_MockClient`), so any
-      # golden row scored on generated text (`fact_assert`, `enumeration_assert`)
-      # or that requires NOT being refused (`small_talk`, which retrieval always
-      # refuses with an empty corpus) fails regardless of code correctness --
-      # confirmed against the real, accepted eval report (evals/report.md), where
-      # a01/a02/a10/a11 already carry the same failures against the real model.
-      # Filtering them out still exercises the real schema/migrations and the
-      # full retrieval SQL (dense+FTS+trgm), which is what this smoke step is
-      # actually meant to catch -- e.g. it fails loudly again if `c.fold`
-      # (002_hybrid_lexical.sql) ever goes missing. See task-45-report.md.
+      # Plumbing smoke test: no corpus is ingested and --mock returns a fixed answer,
+      # so rows scored on generated text (fact/enumeration asserts, small talk) can't
+      # pass by design. The rest still run the real migrations and hybrid retrieval SQL.
       - run: |
           set -e
           python -c "

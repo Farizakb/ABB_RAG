@@ -9,7 +9,7 @@ setup:
 	fi
 	@echo "setup OK."
 scrape:  ; docker compose --profile scraper run --rm scraper --max-pages 400
-up:      ; docker compose up -d --build
+up:      ; docker compose up -d --build --wait
 down:    ; docker compose down
 logs:    ; docker compose logs -f
 ps:      ; docker compose ps
@@ -18,11 +18,10 @@ ps:      ; docker compose ps
 db-ui:   ; docker compose --profile tools up -d pgadmin
 ingest:  ; python scripts/ingest_fixture.py fixtures/corpus_sample.json
 demo:
-	$(MAKE) up
-	@echo "waiting for health…" && sleep 8
+	docker compose up -d --build --wait
 	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
 	 python scripts/seed_demo.py $$CID && \
-	 echo "\nOpen http://localhost:8080 — corpus $$CID is ready with seeded history."
+	 echo "Open http://localhost:8080 - corpus $$CID is ready with seeded history."
 # `rag` is the only container holding OPENAI_API_KEY and the only one that can
 # reach Postgres by its compose hostname (`db`) -- psycopg from the host hits
 # psycopg_pool PoolTimeout even with a correct DSN (P132). So the golden set
