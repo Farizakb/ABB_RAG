@@ -2,29 +2,48 @@ services:
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
-    environment: { POSTGRES_USER: abb, POSTGRES_PASSWORD: abb, POSTGRES_DB: abb, EMBEDDING_DIM: "${EMBEDDING_DIM}" }
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-abb}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-abb}
+      POSTGRES_DB: ${POSTGRES_DB:-abb}
+      EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
     volumes: ["pgdata:/var/lib/postgresql/data", "./db/migrations:/migrations:ro", "./db/init:/docker-entrypoint-initdb.d:ro"]
-    healthcheck: { test: ["CMD-SHELL", "pg_isready -U abb"], interval: 5s, retries: 10 }
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-abb}"], interval: 5s, retries: 10 }
     # Loopback-only, deliberately (P70): lets host-side `pytest services/rag`
     # reach Postgres to build its own `_test` database. `rag` (which holds the
     # OpenAI key) gets no such port -- that absence is a standing ruling.
-    ports: ["127.0.0.1:5432:5432"]
+    ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
   rag:
     build: { context: ., dockerfile: services/rag/Dockerfile }
     restart: unless-stopped
-    env_file: [.env]
+    # The only service that reads OPENAI_API_KEY (services/rag/app/config.py,
+    # services/rag/app/embedder.py, generate.py) -- so it is the only one that
+    # gets it, and `:?` fails the whole `up` fast, before any container starts,
+    # if a reviewer forgot to paste it into .env.
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-abb}:${POSTGRES_PASSWORD:-abb}@db:5432/${POSTGRES_DB:-abb}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?Set OPENAI_API_KEY in .env -- copy .env.example if you have not yet}
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
     depends_on: { db: { condition: service_healthy } }
     healthcheck: { test: ["CMD", "python", "-c", "import httpx;httpx.get('http://localhost:8000/healthz').raise_for_status()"], interval: 10s, retries: 5 }
   chat:
     build: { context: ., dockerfile: services/chat/Dockerfile }
     restart: unless-stopped
-    env_file: [.env]
+    # No OPENAI_API_KEY here -- services/chat/app/config.py has no such field
+    # and grep confirms nothing under services/chat reads it (README's
+    # key-isolation note). It only ever needs the DB and rag's internal URL.
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-abb}:${POSTGRES_PASSWORD:-abb}@db:5432/${POSTGRES_DB:-abb}
+      RAG_URL: http://rag:8000
+      LLM_MODEL: ${LLM_MODEL:-gpt-5.6-luna}
     depends_on: { db: { condition: service_healthy }, rag: { condition: service_started } }
     healthcheck: { test: ["CMD", "python", "-c", "import httpx;httpx.get('http://localhost:8000/healthz').raise_for_status()"], interval: 10s, retries: 5 }
   web:
     build: { context: ./apps/web }
     restart: unless-stopped
-    ports: ["8080:80"]
+    ports: ["${WEB_PORT:-8080}:80"]
     depends_on: [chat, rag]
     # 127.0.0.1, not localhost: nginx:alpine only binds IPv4 (this image's
     # ipv6-listen entrypoint script skips patching a custom default.conf, so
@@ -47,7 +66,7 @@ services:
       PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set in .env}
       PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set in .env}
       PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"
-    ports: ["127.0.0.1:5050:80"]
+    ports: ["127.0.0.1:${PGADMIN_PORT:-5050}:80"]
     volumes: ["./deploy/pgadmin/servers.json:/pgadmin4/servers.json:ro"]
     depends_on: { db: { condition: service_healthy } }
 volumes: { pgdata: }

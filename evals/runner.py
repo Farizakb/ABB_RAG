@@ -342,10 +342,19 @@ def main() -> int:
         print(report.markdown(data["config"]))
         return report.exit_code()
 
+    from app.config import settings
     from app.embedder import FakeEmbedder, OpenAIEmbedder
     from app.generate import OpenAIClient, answer
 
-    embedder = FakeEmbedder(dim=8) if args.mock else OpenAIEmbedder()
+    # dim=settings.embedding_dim, not a hardcoded 8: a real corpus (ingested by
+    # `make demo`/`make ingest`) is embedded at EMBEDDING_DIM (1536 by
+    # default), and `rag.chunks.embedding` is a fixed-width `vector(N)` column
+    # -- a mismatched query vector makes every retrieval call fail. Matching
+    # the schema's width is what lets `--mock` retrieve for real (dense leg is
+    # noise, but the FTS/trgm legs are real lexical signal over real content)
+    # against an already-ingested corpus, which is the whole point of
+    # `make eval-mock` being free.
+    embedder = FakeEmbedder(dim=settings.embedding_dim) if args.mock else OpenAIEmbedder()
     client = _MockClient() if args.mock else OpenAIClient()
 
     items = [json.loads(line) for line in pathlib.Path(args.golden).read_text("utf-8").splitlines()]

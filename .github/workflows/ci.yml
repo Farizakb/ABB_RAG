@@ -23,7 +23,11 @@ jobs:
       # duplicate-module-name error (same reason the pytest step below is
       # split per project).
       - run: ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
-      - run: psql "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f db/migrations/001_schema.sql
+      - run: |
+          set -e
+          for f in db/migrations/*.sql; do
+            psql -v ON_ERROR_STOP=1 "$DATABASE_URL" -v dim="$EMBEDDING_DIM" -f "$f"
+          done
       # services/rag/app and services/chat/app are both top-level package `app`,
       # so a single bare pytest run can't import both. Run per project instead,
       # and skip any project a later task hasn't created yet rather than going red.
@@ -32,4 +36,15 @@ jobs:
           if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi
           if [ -d services/chat ]; then PYTHONPATH=packages/contracts pytest services/chat; fi
           if [ -d evals ]; then PYTHONPATH=services/rag:packages/contracts pytest evals; fi
-      - run: PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden evals/golden.jsonl --limit 10 --mock --out /tmp/report.md
+      # Plumbing smoke test: no corpus is ingested and --mock returns a fixed answer,
+      # so rows scored on generated text (fact/enumeration asserts, small talk) can't
+      # pass by design. The rest still run the real migrations and hybrid retrieval SQL.
+      - run: |
+          set -e
+          python -c "
+          import json, pathlib
+          items = [json.loads(l) for l in pathlib.Path('evals/golden.jsonl').read_text('utf-8').splitlines() if l.strip()]
+          safe = [it for it in items if not (it.get('fact_assert') or it.get('enumeration_assert') or it.get('type') == 'small_talk')]
+          pathlib.Path('/tmp/golden_ci_smoke.jsonl').write_text('\n'.join(json.dumps(it) for it in safe[:10]) + '\n', encoding='utf-8')
+          "
+          PYTHONPATH=services/rag:packages/contracts python evals/runner.py --golden /tmp/golden_ci_smoke.jsonl --mock --out /tmp/report.md

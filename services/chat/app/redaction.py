@@ -7,7 +7,10 @@ import re
 # product figure like "50 000" (5 digits) can never match.
 CARD = re.compile(r"\b(?:\d[ -]?){13,19}\b")
 PHONE = re.compile(r"(?:\+994|0)[ -]?\d{2}[ -]?\d{3}[ -]?\d{2}[ -]?\d{2}\b")
-FIN = re.compile(r"\b(?=[A-Z0-9]{7}\b)(?=.*\d)(?=.*[A-Z])[A-Z0-9]{7}\b")
+FIN = re.compile(
+    r"\b(?=[A-Z0-9]{7}\b)(?=[A-Z0-9]{0,6}\d)(?=[A-Z0-9]{0,6}[A-Z])[A-Z0-9]{7}\b",
+    re.IGNORECASE,
+)
 
 
 def redact(text: str) -> str:

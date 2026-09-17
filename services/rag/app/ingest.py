@@ -89,12 +89,25 @@ def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
                 return corpus_id
 
         row_id = uuid.uuid4()
-        conn.execute(
-            "INSERT INTO rag.corpora (id, content_hash, manifest, status, stage, "
-            "embedding_model, embedding_version) VALUES (%s,%s,%s,'processing','validating',%s,1)",
-            (row_id, corpus_id, json.dumps(corpus.stats), embedder.model),
-        )
-        conn.commit()
+        try:
+            conn.execute(
+                "INSERT INTO rag.corpora (id, content_hash, manifest, status, stage, "
+                "embedding_model, embedding_version) "
+                "VALUES (%s,%s,%s,'processing','validating',%s,1)",
+                (row_id, corpus_id, json.dumps(corpus.stats), embedder.model),
+            )
+            conn.commit()
+        except psycopg.errors.UniqueViolation:
+            # Two concurrent uploads for the same NEW corpus can both pass the
+            # "no existing row" check above before either commits. Only one
+            # INSERT can win the (content_hash, embedding_model) unique
+            # constraint (001_schema.sql) -- the loser must not propagate this
+            # into _run's except handler, whose failure UPDATE is keyed on the
+            # same (content_hash, embedding_model) pair and would clobber the
+            # winner's row. Back off exactly like the "a fresh processing row
+            # already exists" branch above: another attempt owns this corpus now.
+            conn.rollback()
+            return corpus_id
 
         pending: list[tuple[uuid.UUID, Chunk, str]] = []
         fact_count = 0

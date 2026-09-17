@@ -37,7 +37,7 @@ brief's own wording and says where it is covered and how that was verified this 
 
 **Evaluation criteria** (the docx's own grading axes): Functionality → `evals/report.md` and the
 [measured budgets](#measured-numbers-against-every-budget-including-the-misses) below; Code
-Quality → `ruff`/`mypy` clean, [260 tests](#how-to-run-tests-and-evals) green; Efficiency → the
+Quality → `ruff`/`mypy` clean, [264 tests](#run-path) green; Efficiency → the
 same latency/cost budgets, disclosed misses included; Design → §11.4's ledger-style direction
 (palette, tabular numerals, one animation); Documentation → this file plus six ADRs plus
 `docs/error-analysis.md`.
@@ -86,18 +86,14 @@ this repository.**
 
 ## Prerequisites
 
-- Docker and Docker Compose (the whole stack — Postgres, `rag`, `chat`, `web` — runs in
-  containers; nothing needs a local Python or Node install to run the app).
+- Docker and Docker Compose (Postgres, `rag`, `chat`, `web` all run in containers).
 - An OpenAI API key (see above).
-- To run the scraper, tests, or scripts directly on the host: Python 3.12 and Node 20, matching
-  the versions pinned in the service Dockerfiles.
-- **Windows reviewers:** `make` is not installed by default on a bare Windows host and none of
-  the targets below will run as `make <target>` without it. Install it (Git Bash ships with most
-  Unix tools but not `make` itself; `winget install ezwinports.make` or WSL both work), or run the
-  raw `docker compose` / shell commands given under each section below — every `make` target in
-  this README also has its literal command spelled out. This was confirmed by actually running
-  every target's underlying command line by line on Windows 11 / PowerShell 5.1 with Git Bash,
-  not assumed (Task 41).
+- For `make demo`/`eval` and the tests: Python 3.12 with `httpx` (`pip install httpx` is enough for
+  loading the corpus), and Node 20 for the web tests. **Docker only?** Run `docker compose up -d
+  --build --wait`, open `http://localhost:8080`, and drop `fixtures/corpus_sample.json` on the Data
+  screen (Analytics then starts empty instead of seeded).
+- **Windows:** `make` isn't installed by default (`winget install ezwinports.make` or WSL); every
+  target below also has its raw command.
 
 ---
 
@@ -107,54 +103,60 @@ From `.env.example`:
 
 | Variable | What it does |
 |---|---|
-| `OPENAI_API_KEY` | Required. Read only by `services/rag`; a full eval run costs about ten cents. |
+| `OPENAI_API_KEY` | **Required, no default.** `docker compose`'s `${OPENAI_API_KEY:?...}` fails `up` fast if it's unset. Read only by `services/rag` — `chat` is never given it (`docker-compose.yml`'s `rag`/`chat` `environment:` blocks). |
 | `LLM_MODEL` | Generation model id, default `gpt-5.6-luna`. Config-driven so the model choice is a decision, not a hardcode. |
 | `EMBEDDING_MODEL` | Embedding model id, default `text-embedding-3-small`, chosen by the day-three bake-off in [ADR-0005](docs/adr/0005-retrieval-and-embedding.md). |
 | `EMBEDDING_DIM` | Vector column width, default `1536`. Config, not a migration rewrite, if the embedder ever changes. |
-| `DATABASE_URL` | Postgres connection string used inside the containers. |
-| `RAG_URL` | How `chat` reaches `rag` internally (`http://rag:8000`). |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | Postgres credentials, default `abb`/`abb`/`abb`. `DATABASE_URL` is built from these inside `docker-compose.yml` — one place to change. |
+| `DB_PORT` / `WEB_PORT` / `PGADMIN_PORT` | Published host ports, default `5432`/`8080`/`5050`. Change only on conflict with something else already listening; `db` and `pgadmin` stay bound to `127.0.0.1`. |
 | `PGADMIN_DEFAULT_EMAIL` | Login for the walkthrough-only pgAdmin container (`make db-ui`). Placeholder in `.env.example`; replace before use. Required — pgAdmin will not start without it. |
 | `PGADMIN_DEFAULT_PASSWORD` | Same, for the password. Required, no built-in default. |
 
 ---
 
-## How to scrape
+## Run path
 
-`make scrape` (raw: `docker compose --profile scraper run --rm scraper --max-pages 400`) runs
-`packages/scraper`, a Typer CLI over `httpx` + `selectolax`, against `abb-bank.az`'s sitemap —
-one request per second with jitter, full `robots.txt` compliance, raw HTML cached to `data/raw/`
-so re-parsing never means re-crawling. It writes `data/corpus_<ts>.json`.
+Minimum: copy `.env.example` to `.env`, paste your `OPENAI_API_KEY`, then `make up` + `make demo`.
+Nothing else needs editing — every other value in `.env.example` already has a working default.
 
-**A reviewer does not need to run this.** The real scraped artifact ships committed as
-`fixtures/corpus_sample.json` — the exact file `make demo` ingests and `evals/report.md` was
-generated against.
+| Step | `make` | Raw command (no `make`) |
+|---|---|---|
+| Setup | `make setup` | `cp .env.example .env` (then edit `OPENAI_API_KEY`) |
+| Start the stack | `make up` | `docker compose up -d --build --wait` |
+| Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
+| Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
+| Run tests | `make test` | `pytest packages`; `PYTHONPATH=packages/contracts pytest services/rag`; `PYTHONPATH=packages/contracts pytest services/chat`; `PYTHONPATH=services/rag:packages/contracts pytest evals`; `cd apps/web && npm test -- --run` |
+| Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
+| Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
+| DB inspector | `make db-ui` | `docker compose --profile tools up -d pgadmin`, then open `http://127.0.0.1:5050` |
+| Tail logs | `make logs` | `docker compose logs -f` |
+| Container status | `make ps` | `docker compose ps` |
 
----
+**A reviewer does not need to run the scraper.** `fixtures/corpus_sample.json` is the real, already
+scraped artifact — the file `make demo`/`make ingest` loads and `evals/report.md` was generated
+against.
 
-## How to start
+Opening `http://localhost:8080` after `make demo`: the Data screen already shows a processed
+corpus ("already ingested" fast path), the Chat tab is unlocked, and Analytics is populated with
+seeded history — no empty charts.
 
-`make demo` is the one command: it starts the stack, ingests the committed fixture, and seeds
-demo interactions. Raw commands, since `make` may be absent:
+pgAdmin (`make db-ui`) is profile-gated and loopback-only — it never starts with `make up`/`demo`.
+Log in with `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` from `.env`; the `ABB RAG db`
+server is pre-registered via `deploy/pgadmin/servers.json`, which assumes the default
+`POSTGRES_USER`/`POSTGRES_DB` — if you changed those in `.env`, re-enter the credentials in
+pgAdmin's connection dialog.
 
-```bash
-docker compose up -d --build
-# wait for health, then:
-python scripts/ingest_fixture.py fixtures/corpus_sample.json
-python scripts/seed_demo.py <corpus_id printed above>
-```
+**Windows without `make`:** every raw command above is plain `docker compose` / `pytest` /
+`python`, runnable from PowerShell or Git Bash — `make` only saves typing.
 
-Then open `http://localhost:8080`. The reviewer should see: the Data screen already showing a
-processed corpus ("already ingested" fast path), the Chat tab unlocked, and the Analytics screen
-populated with seeded history — no empty charts.
+`services/rag/app` and `services/chat/app` are both a top-level package named `app`, which is why
+`test`/`lint` run per project rather than once for the whole repo — a single bare `pytest`/`mypy`
+invocation hits a duplicate-module-name error across the two.
 
-To run the walkthrough database inspector (pgAdmin — profile-gated, loopback-only, never part of
-the running stack): `make db-ui` (raw: `docker compose --profile tools up -d pgadmin`), then open
-`http://127.0.0.1:5050`. It never starts with `docker compose up` or `make demo`. Log in with
-`PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` from `.env` (placeholders in `.env.example`
-— replace before use); the `ABB RAG db` server is pre-registered read-only via
-`deploy/pgadmin/servers.json`, mounted into the container. It is a walkthrough tool for
-inspecting `rag.chunks`, `rag.product_facts`, `rag.corpora` and `app.interactions` directly, not
-part of the serving path.
+**264 tests, all green:** `packages` 120, `services/rag` 82, `services/chat` 31, `evals` 23,
+`apps/web` (Vitest) 4. `ruff format`/`ruff check` and both `mypy` calls clean. `make eval` calls
+the live OpenAI API and costs real money — do not re-run it casually; `evals/report.md` and
+`evals/rows.json` are already committed from the last real run.
 
 ---
 
@@ -165,42 +167,6 @@ produced by the scraper. The browser validates it against the corpus JSON schema
 page count, locale and size, and writes it to `localStorage`. Clicking **Process dataset** POSTs
 it to `rag`, which chunks, embeds and writes to Postgres in a background task; the screen polls
 every two seconds until the corpus reaches `ready`, at which point the Chat tab unlocks.
-
----
-
-## How to run tests and evals
-
-```bash
-make test    # or, spelled out:
-pytest packages
-PYTHONPATH=packages/contracts pytest services/rag
-PYTHONPATH=packages/contracts pytest services/chat
-PYTHONPATH=services/rag:packages/contracts pytest evals
-cd apps/web && npm test -- --run
-
-make lint    # or:
-ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
-
-make eval    # or:
-docker compose cp evals rag:/tmp/evals
-docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
-  python evals/runner.py --golden evals/golden.jsonl --corpus-id <id> --out /tmp/report.md
-docker compose cp rag:/tmp/report.md evals/report.md
-```
-
-`services/rag/app` and `services/chat/app` are both a top-level package named `app`, which is why
-`make test` runs pytest once per project rather than once for the whole repo — a single bare
-`pytest`/`mypy` invocation hits a duplicate-module-name error across the two. The Makefile's own
-comments say this too.
-
-**260 tests, all green:** `packages` 120, `services/rag` 82, `services/chat` 27, `evals` 23,
-`apps/web` (Vitest) 4. `ruff format`/`ruff check` clean; `mypy scripts packages services/rag` and
-`mypy services/chat` both clean (measured live on this Windows host, Task 41; a pre-existing
-mypy failure in `generate.py` found by an earlier task was fixed in commit `6e0bab5`).
-
-A full `make eval` run calls the live OpenAI API and costs real money (~$0.10 for the current
-64-item set) — do not re-run it casually; `evals/report.md` and `evals/rows.json` are already
-committed from the last real run.
 
 ---
 
@@ -332,9 +298,9 @@ flowchart TB
 - **The scraper is not in the request path.** It is a run-once CLI plus a `profiles: ["scraper"]`
   Compose service. Nine minutes is not a web request, and no demo should depend on a live crawl
   against the client's production site.
-- **`rag` is the only service that ever holds `OPENAI_API_KEY` in application code** — but see the
-  [key-isolation caveat](#known-limitations--what-production-would-add): the container-environment
-  reality is slightly weaker than "the only service holding the key."
+- **`rag` is the only service that ever holds `OPENAI_API_KEY`**, in application code and in its
+  container environment (`docker-compose.yml`'s `rag`/`chat` `environment:` blocks) — see the
+  [key-isolation note](#known-limitations--what-production-would-add).
 - **`chat` never reads `rag.*` and `rag` never reads `app.*`.** One database, two schemas, no
   cross-schema reads.
 - **The browser never calls `rag` directly**, except through nginx's `/api/v1/corpora` route;
@@ -634,13 +600,11 @@ spec's own documentation requirement:
   bank that is a launch blocker, not a footnote — it needs an in-region or self-hosted model.
   Redaction (above) mitigates what reaches OpenAI in the *question* text; it does not remove the
   underlying data-residency exposure.
-- **Key isolation is narrower than the architecture diagram implies.** Only `services/rag`'s
-  application code ever reads `OPENAI_API_KEY` — confirmed by grep, zero matches in
-  `services/chat`. But `docker-compose.yml` gives **both** `rag` and `chat` `env_file: [.env]`, so
-  the variable is present in `chat`'s container environment too, even though nothing in `chat`
-  reads it. The accurate claim is "only the `rag` service calls OpenAI," not "only `rag` can see
-  the key" — a future hardening step is to scope secrets per service (`.env.rag` / `.env.chat`
-  instead of one shared `env_file`).
+- **Key isolation** (fixed as of Task 45): `services/rag`'s application code is the only place that
+  reads `OPENAI_API_KEY` — confirmed by grep, zero matches in `services/chat` — and now it is also
+  the only container that receives it: `docker-compose.yml` gives `rag`/`chat` their own explicit
+  `environment:` blocks instead of `env_file: [.env]`, so `chat`'s container environment never
+  carries the key at all. Previously both services got the whole `.env` via `env_file`.
 - **Ingest timing was not verified cold, on this corpus, this week.** The database already held
   the shipping corpus before this week's checks ran, so every timed ingest was the idempotent
   status-check fast path (`services/rag/app/ingest.py` is idempotent on `(corpus_id,
