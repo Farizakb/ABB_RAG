@@ -41,7 +41,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
 | Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
 | Run tests | `make test` | `pytest packages`; `PYTHONPATH=packages/contracts pytest services/rag`; `PYTHONPATH=packages/contracts pytest services/chat`; `PYTHONPATH=services/rag:packages/contracts pytest evals`; `cd apps/web && npm test -- --run` |
-| Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
+| Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
 | DB inspector | `make db-ui` | `docker compose --profile tools up -d pgadmin`, then open `http://127.0.0.1:5050` |
 | Tail logs | `make logs` | `docker compose logs -f` |
@@ -67,8 +67,11 @@ server is pre-registered via `deploy/pgadmin/servers.json`, which assumes the de
 `POSTGRES_USER`/`POSTGRES_DB` — if you changed those in `.env`, re-enter the credentials in
 pgAdmin's connection dialog.
 
-**Windows without `make`:** every raw command above is plain `docker compose` / `pytest` /
-`python`, runnable from PowerShell or Git Bash — `make` only saves typing.
+**Windows without `make`:** run the raw commands from Git Bash — `make` only saves typing.
+(`MSYS_NO_PATHCONV=1` stops Git Bash rewriting `/tmp` into a Windows path.)
+
+**Changed `WEB_PORT`?** The corpus loader targets `http://localhost:8080` by default; set
+`RAG_BASE_URL=http://localhost:<WEB_PORT>` before loading the corpus or running evals.
 
 `services/rag/app` and `services/chat/app` are both a top-level package named `app`, which is why
 `test`/`lint` run per project rather than once for the whole repo — a single bare `pytest`/`mypy`

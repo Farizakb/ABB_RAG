@@ -35,14 +35,14 @@ demo:
 eval-mock:
 	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
 	 docker compose cp evals rag:/tmp/evals && \
-	 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
+	 MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
 	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --mock --out /tmp/report.md
 # Real: calls the live OpenAI API for every golden question. Costs roughly
 # ten cents for the current 64-item set (see README).
 eval:
 	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
 	 docker compose cp evals rag:/tmp/evals && \
-	 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
+	 MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
 	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --out /tmp/report.md && \
 	 docker compose cp rag:/tmp/report.md evals/report.md
 # services/rag/app and services/chat/app are both top-level package `app`, so a
