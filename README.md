@@ -43,7 +43,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Run tests | `make test` | `pytest`; `cd frontend && npm test -- --run` |
 | Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py data/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
-| DB inspector | — | `docker compose exec db psql -U abb abb` |
+| DB browser (pgAdmin) | `make db-ui` | `docker compose --profile tools up -d pgadmin`, then open `http://127.0.0.1:5050` — no login, database pre-registered (DB password: `POSTGRES_PASSWORD`, default `abb`) |
 | Tail logs | `make logs` | `docker compose logs -f` |
 | Container status | `make ps` | `docker compose ps` |
 

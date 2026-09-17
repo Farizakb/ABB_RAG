@@ -1,4 +1,4 @@
-.PHONY: setup scrape up down ingest demo eval eval-mock test lint reset-data logs ps
+.PHONY: setup scrape up down ingest demo eval eval-mock test lint reset-data logs ps db-ui
 # Creates .env from .env.example if missing, then checks OPENAI_API_KEY is set
 # to something other than the placeholder -- never prints the value either way.
 setup:
@@ -13,6 +13,7 @@ up:      ; docker compose up -d --build --wait
 down:    ; docker compose down
 logs:    ; docker compose logs -f
 ps:      ; docker compose ps
+db-ui:   ; docker compose --profile tools up -d --wait pgadmin
 ingest:  ; python scripts/ingest_fixture.py data/corpus_sample.json
 demo:
 	docker compose up -d --build --wait
