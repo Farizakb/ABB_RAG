@@ -228,14 +228,10 @@ both of which had named the missing pointer documents by URL the whole time.
 **Hypothesis.** Entry 6 corrected ADR-0005's numbers to 30/43, "measured on the
 shipping corpus `713ea087…`" — every sentence in it was true when it was written.
 Its re-measurement was necessarily performed against whichever artifact
-`data/corpus_sample.json` was at the time, which was `713ea087…`. What entry 6
-could not know is that `713ea087…` being the fixture was not settled fact: ruling
-P155 had proven the 30/43 figure was correctly measured against the artifact that
-then shipped, and consistent with the committed report — but ruling P164, that a
-larger, already-`ready` corpus had been ingested *before* `713ea087…` even
-existed, had not yet been established. Proving P164 is what reverses entry 6's
-conclusion. Entry 6's own method was not wrong; the artifact it measured was about
-to be retired.
+`data/corpus_sample.json` was at the time, which was `713ea087…`. A larger,
+already-`ready` corpus had been ingested *before* `713ea087…` even existed, which
+reverses entry 6's conclusion. Entry 6's own method was not wrong; the artifact it
+measured was about to be retired.
 
 **Change.** `data/corpus_sample.json` replaced with
 `data/corpus_20260915T151437Z.json` (280 documents, 736 chunks,
@@ -254,14 +250,14 @@ returned the corpus id immediately with no embedding calls logged.
 | product subset, with stubs | 30/39 (77%) | 33/39 (85%) |
 | pointer documents present | neither `/filiallar` nor `/atmler` | both, confirmed in `rag.documents` |
 
-Entry 6 above is left exactly as written. It was correct given what P155 alone
-had established, and a log that edits its own history to look consistent after
-the fact is worth nothing.
+Entry 6 above is left exactly as written. It was correct given the evidence that
+was available at the time, and a log that edits its own history to look consistent
+after the fact is worth nothing.
 
-**The user-visible cost.** The two pointer documents are what Task 23 Item 3
-added specifically to stop branch and ATM questions being answered from
-`/android-privacypolicy`. The shipped fixture had neither. A reviewer asking
-where their nearest branch is, against the corpus that was about to ship, would
-have received exactly the `/android-privacypolicy` answer Task 23 existed to
-eliminate — the regression this entry corrects was not cosmetic, it was the
-specific failure mode ADR-0005 Item 3 exists to prevent.
+**The user-visible cost.** The two pointer documents were added specifically to
+stop branch and ATM questions being answered from `/android-privacypolicy`. The
+shipped fixture had neither. A reviewer asking where their nearest branch is,
+against the corpus that was about to ship, would have received exactly the
+`/android-privacypolicy` answer that was meant to be eliminated — the regression
+this entry corrects was not cosmetic, it was the specific failure mode ADR-0005
+Item 3 exists to prevent.

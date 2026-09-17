@@ -191,7 +191,7 @@ def test_headline_is_the_out_of_scope_and_advisory_wrong_answer_rate() -> None:
         {"type": "advisory", "wrong_answer": False},
     ]
     md = Report(rows=rows).markdown({"model": "x", "embedder": "y", "items": 4})
-    assert "Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, 0/2." in md
+    assert "Headline: wrong-answer rate on out_of_scope + advisory, 0/2." in md
     assert "Wrong-answer rate, all 4 items: 1/4." in md
 
 

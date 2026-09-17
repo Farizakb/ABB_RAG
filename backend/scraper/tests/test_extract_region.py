@@ -28,8 +28,7 @@ def test_front_loaded_chrome_is_dropped() -> None:
     by chrome exclusion; '50 000' (content) survives. The block/char bounds
     are a mutation-test tripwire for F1: with `_is_chrome` disabled these
     four strings flow straight into `blocks` and the bounds are violated too
-    (verified locally by patching `_is_chrome` to `lambda node: False` and
-    re-running -- see task-7-report.md)."""
+    (verified locally by patching `_is_chrome` to `lambda node: False`)."""
     html = load("nagd-kredit")
     chrome_strings = ["Tel:", "Xidmət şəbəkəsi", "Karyera portalı", "Ünvan:"]
     for s in chrome_strings:
@@ -92,16 +91,14 @@ def test_nagd_kredit_faq_headings_survive_inline_markup() -> None:
     ],
 )
 def test_biznes_pages_share_the_product_page_shape(name: str, path: str) -> None:
-    """Gate item V-1. 88 of the 185 core pages live here and were never fetched
+    """88 of the 185 core pages live here and were never fetched
     when the extraction rules were written.
 
-    Measurement (see task-7-report.md): these three are segment-hub pages
-    with a tile carousel, not product pages -- they have no <nav
-    aria-label="breadcrumb"> and no <h1> at all. `crumbs == []` is the honest
-    result for them (V-1's real finding), not a bug; the content-region
+    These three are segment-hub pages with a tile carousel, not product pages
+    -- they have no <nav aria-label="breadcrumb"> and no <h1> at all.
+    `crumbs == []` is the honest result for them, not a bug; the content-region
     strategy (landmark/widget exclusion, see extract.py) still recovers their
-    real content, which is what this gate is actually protecting.
-    """
+    real content."""
     blocks, crumbs = content_blocks(load(name), path)
     assert crumbs == []
     assert sum(len(b.text) for b in blocks) > 400

@@ -234,7 +234,7 @@ class Report:
         lines = [
             "# Eval report",
             "",
-            f"**Headline (SPEC §8.2): wrong-answer rate on out_of_scope + advisory, "
+            f"**Headline: wrong-answer rate on out_of_scope + advisory, "
             f"{len(wrong_refusal)}/{len(refusal_set)}.** Abstention beats guessing.",
             "",
             f"Wrong-answer rate, all {len(self.rows)} items: {len(wrong)}/{len(self.rows)}.",
@@ -261,7 +261,7 @@ class Report:
             f"| generation | {generation_lat['median']} | {generation_lat['p95']} | "
             f"{generation_lat['max']} |",
             "",
-            "## Budgets (SPEC §8.4 Global Constraints)",
+            "## Budgets",
             "",
             "### Latency",
             "",

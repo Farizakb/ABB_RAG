@@ -113,7 +113,7 @@ def test_a_trim_that_is_not_in_the_corpus_falls_back_to_the_page_itself() -> Non
 def test_each_chunk_of_the_same_document_keeps_its_own_text(
     db: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Task D regression. Measured on the live corpus 6fcf823c... over the 45
+    """Regression. Measured on the live corpus 6fcf823c... over the 45
     golden questions plus the known-failing valyuta question: 29 of 46 were
     affected by the old `source_texts()`, which keyed its lookup dict by URL
     -- so when several chunks of the same document ranked in the same top-k

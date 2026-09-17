@@ -1,6 +1,6 @@
 # backend/scraper/Dockerfile
 # Build context is the repo root (see docker-compose.yml's `scraper` service):
-# abb_scraper depends on the sibling `contracts` package, so both are copied in.
+# abb_scraper depends on the sibling `shared` package, so both are copied in.
 FROM python:3.12.7-slim
 
 WORKDIR /app
