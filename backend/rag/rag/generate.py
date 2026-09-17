@@ -1,4 +1,4 @@
-# backend/rag/app/generate.py
+# backend/rag/rag/generate.py
 # ruff: noqa: RUF001, RUF003 -- genuine Azerbaijani copy (REFUSAL_AZ,
 # ADVISORY_AZ, ADVISORY_HINTS, _CLAIM_STEMS and the comments naming its
 # "haqqı" entry) contains dotless-i and friends; same convention as
@@ -10,16 +10,16 @@ import re
 import time
 from typing import Literal, Protocol
 
-from contracts.models import AnswerResponse, RefusalClass, Source
 from openai import OpenAI
 from pydantic import BaseModel, ValidationError
+from shared.contracts import AnswerResponse, RefusalClass, Source
 
-from app.config import settings
-from app.embedder import Embedder
-from app.retrieval import retrieve
+from rag.config import settings
+from rag.embedder import Embedder
+from rag.retrieval import retrieve
 
 PROMPT_VERSION = "answer_v2"
-# chat's call into rag (backend/chat/app/routes.py) gives up after 60s.
+# chat's call into rag (backend/chat/chat/routes.py) gives up after 60s.
 # Worst case here is timeout x (retries + 1) = 40s, which leaves headroom for
 # the query embedding so a stalled OpenAI call fails in rag, not as a chat 502.
 GENERATION_TIMEOUT_S = 20.0

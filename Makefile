@@ -42,20 +42,10 @@ eval:
 	 MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
 	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --out /tmp/report.md && \
 	 docker compose cp rag:/tmp/report.md evals/report.md
-# backend/rag/app and backend/chat/app are both top-level package `app`, so a
-# single bare pytest run can't import both. Run per project instead, and skip
-# any project that doesn't exist yet rather than going red.
 test:
-	if [ -d backend/shared ]; then pytest backend/shared backend/scraper; fi
-	if [ -d backend/rag ]; then PYTHONPATH=backend/shared pytest backend/rag; fi
-	if [ -d backend/chat ]; then PYTHONPATH=backend/shared pytest backend/chat; fi
-	if [ -d evals ]; then PYTHONPATH=backend/rag:backend/shared pytest evals; fi
-	if [ -f frontend/package.json ]; then cd frontend && npm test -- --run; fi
-# mypy in two calls for the same reason as `test` above: backend/rag/app and
-# backend/chat/app are both top-level package `app`, so one bare `mypy`
-# invocation (which type-checks pyproject.toml's [tool.mypy] `files` list as
-# a single run) hits mypy's duplicate-module-name error.
-lint:    ; ruff format --check . && ruff check . && mypy scripts backend/shared backend/scraper backend/rag && mypy backend/chat
+	pytest
+	cd frontend && npm test -- --run
+lint:    ; ruff format --check . && ruff check . && mypy
 # DESTROYS the Postgres volume (every ingested corpus and interaction row)
 # before bringing the stack back up. No confirmation prompt. Renamed from
 # `fresh` so the name itself says what it does -- never run this against a

@@ -1,8 +1,8 @@
 # backend/rag/tests/test_health.py
 import pytest
-from app.config import settings
-from app.main import app
 from fastapi.testclient import TestClient
+from rag.config import settings
+from rag.main import app
 
 
 def test_healthz_reports_db_and_openai_reachability() -> None:

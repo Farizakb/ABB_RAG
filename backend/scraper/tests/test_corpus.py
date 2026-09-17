@@ -8,7 +8,7 @@ from abb_scraper.corpus import build_corpus
 from abb_scraper.extract import content_blocks, dedupe_blocks
 from abb_scraper.facts import extract_facts
 from abb_scraper.fetcher import FetchResult
-from contracts.models import Corpus, Document
+from shared.contracts import Corpus, Document
 
 TODAY = date(2026, 9, 14)
 

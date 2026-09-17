@@ -7,8 +7,8 @@ import json
 from typing import Any
 
 import pytest
-from app.embedder import FakeEmbedder
-from app.generate import answer
+from rag.embedder import FakeEmbedder
+from rag.generate import answer
 
 
 class Client:
@@ -91,7 +91,7 @@ def test_advisory_question_with_no_retrieved_sources_still_refuses_as_advisory(
     vector search happened to clear the floor. Force the empty-retrieval path the
     same way the floor test does (monkeypatch the floor above the maximum
     possible cosine score), not by inventing a second mechanism."""
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", 2.0)
     r = answer(
         seeded_corpus, "Will I be approved for a mortgage?", FakeEmbedder(dim=8), Client(False)
     )

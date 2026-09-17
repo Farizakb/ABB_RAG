@@ -1,13 +1,13 @@
-# backend/rag/app/main.py
+# backend/rag/rag/main.py
 from __future__ import annotations
 
 import logging
 
 from fastapi import FastAPI
 
-from app.config import settings
-from app.db import get_conn
-from app.routes import internal_router, router
+from rag.config import settings
+from rag.db import get_conn
+from rag.routes import internal_router, router
 
 log = logging.getLogger("rag")
 app = FastAPI(title="ABB Assistant — rag")

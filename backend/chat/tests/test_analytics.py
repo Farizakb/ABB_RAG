@@ -9,7 +9,7 @@ from typing import Any
 
 import httpx
 import pytest
-from app.main import app
+from chat.main import app
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -108,7 +108,7 @@ def test_bad_window_returns_422(db: Any) -> None:
 # The write path must persist `retrieval` from `data["sources"]` (the
 # prompt sources the model actually saw: n/url/score/source_class), not
 # rag's internal dense-candidate list (`data.get("retrieval")`, shaped
-# {document_id, url, score} with no `n` -- see backend/rag/app/retrieval.py
+# {document_id, url, score} with no `n` -- see backend/rag/rag/retrieval.py
 # `candidates`). That mismatch is why analytics.TOP_SOURCES's join on
 # `(s->>'n')::int = c::int` never matched anything in production, no matter
 # what test_top_sources_counts_resolved_citations_not_retrieved_candidates
@@ -167,7 +167,7 @@ def test_write_path_persists_p108_retrieval_shape_and_top_sources_resolves(
         request = httpx.Request("POST", url)
         return httpx.Response(200, json=payload, request=request)
 
-    monkeypatch.setattr("app.routes.httpx.post", _post)
+    monkeypatch.setattr("chat.routes.httpx.post", _post)
 
     r = client.post(
         "/api/v1/questions", json={"corpus_id": "c1", "question": "kredit kartı haqqında?"}

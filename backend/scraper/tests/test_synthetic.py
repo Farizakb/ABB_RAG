@@ -11,7 +11,7 @@ from abb_scraper.synthetic import (
     listing_enumerates,
     pointer_documents,
 )
-from contracts.models import Document, SourceClass
+from shared.contracts import Document, SourceClass
 
 
 def doc(

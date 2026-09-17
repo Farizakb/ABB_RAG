@@ -1,9 +1,9 @@
-# backend/chat/app/analytics.py
+# backend/chat/chat/analytics.py
 from __future__ import annotations
 
 from typing import Any
 
-from app.db import get_conn
+from chat.db import get_conn
 
 # VOLUME also splits out `refused_unsafe` so the day-by-day chart and the
 # refusal-rate tile both account for all three refusal_class values, not

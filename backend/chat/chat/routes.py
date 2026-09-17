@@ -1,4 +1,4 @@
-# backend/chat/app/routes.py
+# backend/chat/chat/routes.py
 from __future__ import annotations
 
 import json
@@ -8,15 +8,15 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from contracts.models import QuestionRequest, QuestionResponse, RefusalClass, Source
 from fastapi import APIRouter, HTTPException, Query, Request
+from shared.contracts import QuestionRequest, QuestionResponse, RefusalClass, Source
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
-from app import analytics
-from app.config import settings
-from app.db import get_conn
-from app.redaction import redact
+from chat import analytics
+from chat.config import settings
+from chat.db import get_conn
+from chat.redaction import redact
 
 router = APIRouter(prefix="/api/v1")
 
@@ -193,7 +193,7 @@ def _persist(
 def _retrieval_from_sources(data: dict[str, Any]) -> list[dict[str, Any]]:
     """Persist `retrieval` as the prompt sources the model actually saw
     (`data["sources"]`), not rag's internal dense-candidate list
-    (`data.get("retrieval")`, see backend/rag/app/retrieval.py's
+    (`data.get("retrieval")`, see backend/rag/rag/retrieval.py's
     `candidates`). The latter is `{document_id, url, score}` with no `n`, so
     analytics.TOP_SOURCES's join on `(s->>'n')::int = c::int` never matched
     anything in production -- `top_sources` was always empty. `sources` is

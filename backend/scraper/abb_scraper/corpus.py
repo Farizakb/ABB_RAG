@@ -22,7 +22,7 @@ from abb_scraper.extract import (
 from abb_scraper.facts import extract_facts, reassemble
 from abb_scraper.fetcher import FetchResult
 from abb_scraper.synthetic import bank_facts_document, index_documents, pointer_documents
-from contracts.models import Corpus, Document, Fact
+from shared.contracts import Corpus, Document, Fact
 
 VOLATILE_PATHS = ("/ferdi/valyuta-mezenneleri",)
 

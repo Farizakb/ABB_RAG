@@ -6,11 +6,11 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
-from app.config import settings
-from app.embedder import FakeEmbedder
-from app.ingest import ingest_corpus
-from app.retrieval import _rrf, _tsquery, retrieve
-from contracts.models import Corpus, Document
+from rag.config import settings
+from rag.embedder import FakeEmbedder
+from rag.ingest import ingest_corpus
+from rag.retrieval import _rrf, _tsquery, retrieve
+from shared.contracts import Corpus, Document
 
 
 def test_returns_top_k_prompt_sources_from_top_k_candidates(seeded_corpus: str, db: Any) -> None:
@@ -63,7 +63,7 @@ def test_floor_filters_candidates_below_threshold(
     # returns real results at the real, measured floor shows the emptiness
     # that follows is the floor's doing.
     assert retrieve(seeded_corpus, query, embedder).sources != []
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", 2.0)
     assert retrieve(seeded_corpus, query, embedder).sources == []
 
 
@@ -83,7 +83,7 @@ def test_every_source_carries_a_listing_url_derived_from_its_own_url(
 
 
 def test_a_top_level_page_is_its_own_listing_rather_than_the_bare_host() -> None:
-    from app.retrieval import listing_url_for
+    from rag.retrieval import listing_url_for
 
     known = {"https://abb-bank.az/kampaniyalar", "https://abb-bank.az/filiallar"}
     assert (
@@ -100,7 +100,7 @@ def test_a_trim_that_is_not_in_the_corpus_falls_back_to_the_page_itself() -> Non
     """Invariant 12, second half. Trimming a segment produces a *plausible* URL,
     and a plausible URL that 404s on the bank's own domain is worse than no link.
     Prefix-correctness is not existence, so the trim must be proven, not assumed."""
-    from app.retrieval import listing_url_for
+    from rag.retrieval import listing_url_for
 
     deep = "https://abb-bank.az/haqqimizda/satinalmalar/tender-2026-11"
     assert listing_url_for(deep, {"https://abb-bank.az/haqqimizda"}) == deep
@@ -145,7 +145,7 @@ def test_each_chunk_of_the_same_document_keeps_its_own_text(
     # range) so all 3 chunks clear it regardless of sign -- same technique as
     # test_floor_filters_candidates_below_threshold -- isolating the collapse
     # bug under test from floor filtering.
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", -2.0)
 
     result = retrieve(corpus_id, "kredit", FakeEmbedder(dim=8), k_candidates=10, k_prompt=3)
 
@@ -186,7 +186,7 @@ def test_prompt_gets_distinct_documents_not_several_chunks_of_one(
         ),
     ]
     corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", -2.0)
 
     result = retrieve(corpus_id, "kredit", FakeEmbedder(dim=8), k_candidates=10, k_prompt=3)
 
@@ -201,13 +201,13 @@ def test_prompt_gets_distinct_documents_not_several_chunks_of_one(
 def test_texts_is_empty_when_no_source_clears_the_floor(
     seeded_corpus: str, db: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", 2.0)
     result = retrieve(seeded_corpus, "kredit", FakeEmbedder(dim=8))
     assert result.sources == [] and result.texts == {}
 
 
 def test_a_trailing_slash_in_the_corpus_still_counts_as_existing() -> None:
-    from app.retrieval import listing_url_for
+    from rag.retrieval import listing_url_for
 
     assert (
         listing_url_for(
@@ -245,7 +245,7 @@ def test_a_lexical_only_match_can_reach_the_prompt(
         ),
     ]
     corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", -2.0)
 
     result = retrieve(corpus_id, "telefon", FakeEmbedder(dim=8), k_candidates=10, k_prompt=1)
 
@@ -283,7 +283,7 @@ def test_a_lexically_favoured_document_can_outrank_a_higher_dense_score(
         ),
     ]
     corpus_id = ingest_corpus(Corpus(documents=docs), FakeEmbedder(dim=8))
-    monkeypatch.setattr("app.retrieval.settings.retrieval_floor", -2.0)
+    monkeypatch.setattr("rag.retrieval.settings.retrieval_floor", -2.0)
 
     result = retrieve(corpus_id, "telefon", FakeEmbedder(dim=8), k_candidates=10, k_prompt=2)
 

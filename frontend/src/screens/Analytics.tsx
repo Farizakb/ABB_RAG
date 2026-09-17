@@ -4,7 +4,7 @@
 // of truth; the three charts above them only illustrate what the tables
 // already contain. `window` is always the literal "7d" here — never a
 // free-form string — because the server 422s anything that doesn't match
-// ^\d{1,3}d$ (backend/chat/app/routes.py).
+// ^\d{1,3}d$ (backend/chat/chat/routes.py).
 import { useEffect, useState } from "react";
 import {
   Bar, BarChart, CartesianGrid, Legend, Line, LineChart,
@@ -29,7 +29,7 @@ export function Analytics() {
   }, []);
 
   useEffect(() => {
-    // 200 is the server's own ceiling (backend/chat/app/routes.py clamps
+    // 200 is the server's own ceiling (backend/chat/chat/routes.py clamps
     // limit into [1, 200]) -- the highest count "Every question asked" can
     // honestly promise without a second page.
     api.interactions(q, 200).then((r) => {

@@ -1,7 +1,7 @@
 # backend/shared/tests/test_models.py
 import pytest
-from contracts.models import Corpus, Document, Fact, QuestionResponse
 from pydantic import ValidationError
+from shared.contracts import Corpus, Document, Fact, QuestionResponse
 
 
 def test_document_rejects_unknown_source_class() -> None:

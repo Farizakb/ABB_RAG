@@ -1,4 +1,4 @@
-# backend/rag/app/embedder.py
+# backend/rag/rag/embedder.py
 from __future__ import annotations
 
 import hashlib
@@ -6,7 +6,7 @@ from typing import Protocol
 
 from openai import OpenAI
 
-from app.config import settings
+from rag.config import settings
 
 BATCH = 100
 # Embedding calls serve both a single short query string (on the chat->rag

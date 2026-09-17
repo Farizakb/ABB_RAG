@@ -8,7 +8,7 @@ model) and doubles as an end-to-end smoke test. Deliberately
 includes both refusal classes so chart two is not a flat line.
 
 `/api/v1/questions` is rate-limited to 30/minute per remote address
-(backend/chat/app/routes.py), and every request here arrives from the same
+(backend/chat/chat/routes.py), and every request here arrives from the same
 address via nginx, so a 429 is expected mid-run rather than exceptional --
 retried after the server's Retry-After rather than counted as a failure.
 """

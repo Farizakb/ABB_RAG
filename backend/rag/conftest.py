@@ -20,14 +20,14 @@ from collections.abc import Iterator
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
 
-import app.db as db_module
 import psycopg
 import pytest
-from app.config import settings
-from app.embedder import FakeEmbedder
-from app.ingest import ingest_corpus
-from contracts.models import Corpus, Document, Fact
+import rag.db as db_module
 from psycopg_pool import ConnectionPool
+from rag.config import settings
+from rag.embedder import FakeEmbedder
+from rag.ingest import ingest_corpus
+from shared.contracts import Corpus, Document, Fact
 
 MIGRATIONS_DIR = Path(__file__).resolve().parents[2] / "db" / "migrations"
 TEST_DIM = 8
@@ -144,7 +144,7 @@ def _test_pool() -> Iterator[ConnectionPool]:
             conn.execute(path.read_text(encoding="utf-8").replace(":dim", str(TEST_DIM)))
 
     pool = ConnectionPool(test_url, min_size=1, max_size=4, open=True)
-    # app.db.get_conn() reads the module global `pool` at call time, so
+    # rag.db.get_conn() reads the module global `pool` at call time, so
     # rebinding it here redirects every `get_conn()` call -- including inside
     # ingest_corpus -- at the test database for the rest of the session.
     db_module.pool = pool

@@ -1,4 +1,4 @@
-# backend/chat/app/redaction.py
+# backend/chat/chat/redaction.py
 from __future__ import annotations
 
 import re

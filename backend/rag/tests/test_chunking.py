@@ -1,8 +1,8 @@
 # backend/rag/tests/test_chunking.py
 # ruff: noqa: RUF001 -- genuine Azerbaijani fixture/assertion text (dotless-i
 # and friends); see backend/scraper/tests/test_facts.py for the same convention.
-from app.chunking import CHUNK_OVERLAP, CHUNK_TOKENS, chunk_document, tokens_per_char
-from contracts.models import Document
+from rag.chunking import CHUNK_OVERLAP, CHUNK_TOKENS, chunk_document, tokens_per_char
+from shared.contracts import Document
 
 
 def doc(text: str) -> Document:

@@ -146,7 +146,7 @@ def enumeration_context(corpus_id: str, item: dict[str, Any]) -> tuple[list[str]
     be more code than it saves."""
     ea = item.get("enumeration_assert") or {}
     listing = (ea.get("if_no_index") or {}).get("must_carry_listing_url", "")
-    from app.db import get_conn
+    from rag.db import get_conn
 
     with get_conn() as conn:
         rows = conn.execute(ENUM_CONTEXT_SQL, (corpus_id,)).fetchall()
@@ -342,9 +342,9 @@ def main() -> int:
         print(report.markdown(data["config"]))
         return report.exit_code()
 
-    from app.config import settings
-    from app.embedder import FakeEmbedder, OpenAIEmbedder
-    from app.generate import OpenAIClient, answer
+    from rag.config import settings
+    from rag.embedder import FakeEmbedder, OpenAIEmbedder
+    from rag.generate import OpenAIClient, answer
 
     # dim=settings.embedding_dim, not a hardcoded 8: a real corpus (ingested by
     # `make demo`/`make ingest`) is embedded at EMBEDDING_DIM (1536 by

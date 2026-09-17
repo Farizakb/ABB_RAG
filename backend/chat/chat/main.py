@@ -1,4 +1,4 @@
-# backend/chat/app/main.py
+# backend/chat/chat/main.py
 from __future__ import annotations
 
 import logging
@@ -7,9 +7,9 @@ from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
-from app.config import settings
-from app.db import get_conn
-from app.routes import limiter, router
+from chat.config import settings
+from chat.db import get_conn
+from chat.routes import limiter, router
 
 log = logging.getLogger("chat")
 app = FastAPI(title="ABB Assistant — chat")

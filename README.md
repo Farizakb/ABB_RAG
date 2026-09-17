@@ -40,7 +40,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Start the stack | `make up` | `docker compose up -d --build --wait` |
 | Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
 | Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
-| Run tests | `make test` | `pytest backend/shared backend/scraper`; `PYTHONPATH=backend/shared pytest backend/rag`; `PYTHONPATH=backend/shared pytest backend/chat`; `PYTHONPATH=backend/rag:backend/shared pytest evals`; `cd frontend && npm test -- --run` |
+| Run tests | `make test` | `pytest`; `cd frontend && npm test -- --run` |
 | Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
 | DB inspector | — | `docker compose exec db psql -U abb abb` |
@@ -67,12 +67,12 @@ seeded history — no empty charts.
 **Changed `WEB_PORT`?** The corpus loader targets `http://localhost:8080` by default; set
 `RAG_BASE_URL=http://localhost:<WEB_PORT>` before loading the corpus or running evals.
 
-`backend/rag/app` and `backend/chat/app` are both a top-level package named `app`, which is why
-`test`/`lint` run per project rather than once for the whole repo — a single bare `pytest`/`mypy`
-invocation hits a duplicate-module-name error across the two.
+`backend/shared`, `backend/scraper`, `backend/rag` and `backend/chat` are each an editable-installed
+package under its own name (`shared`, `abb_scraper`, `rag`, `chat`), so `pytest` and `mypy` each run
+once for the whole repo instead of per project.
 
 **264 tests, all green:** `backend/shared`+`backend/scraper` 120, `backend/rag` 82, `backend/chat` 31, `evals` 23,
-`frontend` (Vitest) 4. `ruff format`/`ruff check` and both `mypy` calls clean. `make eval` calls
+`frontend` (Vitest) 4. `ruff format`/`ruff check` and `mypy` clean. `make eval` calls
 the live OpenAI API and costs real money — do not re-run it casually; `evals/report.md` and
 `evals/rows.json` are already committed from the last real run.
 
@@ -220,7 +220,7 @@ and returned as a fourth, narrowly-scoped legal state (`grounded=false, refused=
 citations=[]`), not a hole in the cited-or-refused invariant. A leak check
 (`_leaks_bank_content`) re-routes any small-talk reply containing a digit, a `%`, a currency mark,
 a URL, or a price/condition word through the same refusal path — a second line of defence, not the
-first; the residual risk is documented directly in `backend/rag/app/generate.py`'s own docstring.
+first; the residual risk is documented directly in `backend/rag/rag/generate.py`'s own docstring.
 
 ### Hybrid retrieval
 
@@ -324,7 +324,7 @@ and it would need eval coverage this build doesn't have yet.
 ## Known limitations & what production would add
 
 - **Lexical guards for semantic decisions.** `ADVISORY_HINTS` and the small-talk leak lexicon
-  (`backend/rag/app/generate.py`) are string matching over meaning, so they can never be
+  (`backend/rag/rag/generate.py`) are string matching over meaning, so they can never be
   complete. Production routes intent **before** retrieval with a classifier, so a small-talk path
   that never sees sources can't leak a fact by construction. The current design accepts this
   because the failure mode for known cases is a refusal, not a leak — the lexicon is a second line
@@ -343,11 +343,11 @@ and it would need eval coverage this build doesn't have yet.
   exposure.
 - **Ingest timing wasn't verified cold.** The database already held the shipping corpus before
   these checks ran, so every timed run hit the idempotent status-check fast path
-  (`backend/rag/app/ingest.py`), not the embedding-and-indexing work the "under 3 minutes" budget
+  (`backend/rag/rag/ingest.py`), not the embedding-and-indexing work the "under 3 minutes" budget
   is meant to bound. Production would run this on a schedule against a corpus the target database
   has never seen, and alert on regression.
 - **Corpus identity is coarse.** `corpus_id` hashes the whole document set
-  (`backend/shared/contracts/models.py`), so re-uploading an identical corpus is a true no-op,
+  (`backend/shared/shared/contracts.py`), so re-uploading an identical corpus is a true no-op,
   but changing one document produces an entirely new `corpus_id` and re-embeds every document in
   it — there's no embedding reuse keyed on individual chunk text. Production would cache
   embeddings by chunk-text hash across corpus versions and garbage-collect superseded corpora.

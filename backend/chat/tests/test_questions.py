@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.main import app
+from chat.main import app
 from fastapi.testclient import TestClient
 
 client = TestClient(app)
@@ -78,7 +78,7 @@ def test_chat_never_touches_the_rag_schema(db: Any, rag_ok: None) -> None:
     """Invariant 6, asserted rather than trusted."""
     import pathlib
 
-    src = " ".join(p.read_text("utf-8") for p in pathlib.Path("backend/chat/app").rglob("*.py"))
+    src = " ".join(p.read_text("utf-8") for p in pathlib.Path("backend/chat/chat").rglob("*.py"))
     assert "rag." not in src.replace("rag.py", "")
 
 

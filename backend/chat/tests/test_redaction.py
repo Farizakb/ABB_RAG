@@ -3,7 +3,7 @@
 # backend/rag/tests/test_chunking.py.
 from __future__ import annotations
 
-from app.redaction import redact
+from chat.redaction import redact
 
 
 def test_card_shaped_digit_runs_are_masked() -> None:

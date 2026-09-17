@@ -1,4 +1,4 @@
-# backend/rag/app/ingest.py
+# backend/rag/rag/ingest.py
 from __future__ import annotations
 
 import json
@@ -7,11 +7,11 @@ from datetime import timedelta
 from urllib.parse import urlsplit
 
 import psycopg
-from contracts.models import Corpus, Document
+from shared.contracts import Corpus, Document
 
-from app.chunking import Chunk, chunk_document, tokens_per_char
-from app.db import get_conn
-from app.embedder import Embedder
+from rag.chunking import Chunk, chunk_document, tokens_per_char
+from rag.db import get_conn
+from rag.embedder import Embedder
 
 # How long a `processing` row may go without a stage heartbeat before a new
 # ingest attempt treats it as abandoned rather than in flight. Named here so

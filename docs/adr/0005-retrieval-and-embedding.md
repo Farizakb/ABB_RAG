@@ -102,7 +102,7 @@ Hit@5 drops when stubs are excluded, so the rule says stubs stay in — the same
 conclusion the running system already implements, with no reversal to report. This
 strengthens ruling P153: `/atmler` being itself a stub is not an edge case to
 special-case around, it is the reason stub exclusion is rejected.
-`backend/rag/app/retrieval.py` is not modified.
+`backend/rag/rag/retrieval.py` is not modified.
 
 ### Item 3 — a pointer was needed, and says nothing a page does not
 
@@ -129,7 +129,7 @@ the 9 out-of-scope rows, is **0.609** (`r06`,
 overlap across nearly their whole range. Any floor low enough to keep every
 answerable question also passes almost every out-of-scope one, and any floor high
 enough to catch out-of-scope questions silently refuses real ones.
-`retrieval_floor` stays `0.0` in `backend/rag/app/config.py`, and refusals are
+`retrieval_floor` stays `0.0` in `backend/rag/rag/config.py`, and refusals are
 decided by the grounded answer path, not by a similarity threshold. The number
 lives in the eval report, not in a code comment.
 
@@ -163,7 +163,7 @@ the evidence for this decision.
   excluded (34/43 → 32/43, product subset 33/39 → 32/39), because one of the two
   rows lost is `a43`, whose only labelled answer is the `/atmler` pointer document
   — itself `source_class = 'stub'` on this corpus. Excluding stubs would delete a
-  document Item 3 exists to ship. `backend/rag/app/retrieval.py` is unchanged.
+  document Item 3 exists to ship. `backend/rag/rag/retrieval.py` is unchanged.
 - The remaining misses are intent gaps, not ranking noise: the question and the
   page that answers it share almost no vocabulary (`kartima pul nece yatira
   bilerem?`, `a41`, against a page titled "Karta mədaxil" that never uses the verb

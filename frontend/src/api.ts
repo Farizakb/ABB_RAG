@@ -1,8 +1,8 @@
 // frontend/src/api.ts
 //
-// Types mirror backend/shared/contracts/models.py field-for-field.
+// Types mirror backend/shared/shared/contracts.py field-for-field.
 // AnalyticsSummary and InteractionsResponse mirror
-// backend/chat/app/analytics.py's summary()/interactions() return shapes
+// backend/chat/chat/analytics.py's summary()/interactions() return shapes
 // field-for-field instead, since those two aren't Pydantic contracts.
 
 export type SourceClass = "product" | "campaign" | "corporate" | "stub" | "volatile" | "index";

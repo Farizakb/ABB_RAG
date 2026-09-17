@@ -1,4 +1,4 @@
-# backend/shared/contracts/models.py
+# backend/shared/shared/contracts.py
 from __future__ import annotations
 
 import hashlib

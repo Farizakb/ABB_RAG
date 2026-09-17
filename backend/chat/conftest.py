@@ -11,7 +11,7 @@ backend/rag` run never truncates tables this suite depends on, and vice
 versa.
 
 `rag_ok` / `rag_refuses` / `rag_500` monkeypatch `httpx.post` as seen by
-app.routes, so these tests never make a real network call to the sibling
+chat.routes, so these tests never make a real network call to the sibling
 answer service.
 
 `seeded_interactions` inserts a fixed set of `app.interactions` rows for the
@@ -33,11 +33,11 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-import app.db as db_module
+import chat.db as db_module
 import httpx
 import psycopg
 import pytest
-from app.config import settings
+from chat.config import settings
 from psycopg_pool import ConnectionPool
 
 MIGRATION_PATH = Path(__file__).resolve().parents[2] / "db" / "migrations" / "001_schema.sql"
@@ -124,7 +124,7 @@ def _test_pool() -> Iterator[ConnectionPool]:
         conn.execute(sql)
 
     pool = ConnectionPool(test_url, min_size=1, max_size=4, open=True)
-    # app.db.get_conn() reads the module global `pool` at call time, so
+    # chat.db.get_conn() reads the module global `pool` at call time, so
     # rebinding it here redirects every `get_conn()` call at the test
     # database for the rest of the session.
     db_module.pool = pool
@@ -334,17 +334,17 @@ def _fake_post_raw(status: int, content: bytes) -> Any:
 
 @pytest.fixture
 def rag_ok(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.routes.httpx.post", _fake_post(RAG_OK_PAYLOAD, 200))
+    monkeypatch.setattr("chat.routes.httpx.post", _fake_post(RAG_OK_PAYLOAD, 200))
 
 
 @pytest.fixture
 def rag_refuses(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.routes.httpx.post", _fake_post(RAG_REFUSAL_PAYLOAD, 200))
+    monkeypatch.setattr("chat.routes.httpx.post", _fake_post(RAG_REFUSAL_PAYLOAD, 200))
 
 
 @pytest.fixture
 def rag_500(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("app.routes.httpx.post", _fake_post(None, 500))
+    monkeypatch.setattr("chat.routes.httpx.post", _fake_post(None, 500))
 
 
 @pytest.fixture
@@ -354,7 +354,7 @@ def rag_malformed(monkeypatch: pytest.MonkeyPatch) -> None:
     covers a clean error status the code already handled; this covers the
     json.JSONDecodeError hole flagged in code review."""
     monkeypatch.setattr(
-        "app.routes.httpx.post", _fake_post_raw(200, b"<html>502 Bad Gateway</html>")
+        "chat.routes.httpx.post", _fake_post_raw(200, b"<html>502 Bad Gateway</html>")
     )
 
 
@@ -367,4 +367,4 @@ def rag_missing_key(monkeypatch: pytest.MonkeyPatch) -> None:
     branch) rather than json.JSONDecodeError -- both must land in the same
     error-persist branch, but only this fixture proves the shape check
     itself is wired up."""
-    monkeypatch.setattr("app.routes.httpx.post", _fake_post({"foo": "bar"}, 200))
+    monkeypatch.setattr("chat.routes.httpx.post", _fake_post({"foo": "bar"}, 200))

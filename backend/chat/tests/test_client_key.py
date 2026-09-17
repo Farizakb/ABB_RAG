@@ -15,8 +15,8 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from app.main import app
-from app.routes import limiter
+from chat.main import app
+from chat.routes import limiter
 from fastapi.testclient import TestClient
 
 client = TestClient(app)

@@ -19,9 +19,9 @@ COPY --from=build /install /usr/local
 COPY --from=build /opt/tiktoken_cache /opt/tiktoken_cache
 ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache
 WORKDIR /app
-COPY backend/shared/contracts ./contracts
-COPY backend/rag/app ./app
+COPY backend/shared/shared ./shared
+COPY backend/rag/rag ./rag
 RUN useradd -u 10001 -m appuser && chown -R appuser /app
 USER appuser
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "rag.main:app", "--host", "0.0.0.0", "--port", "8000"]

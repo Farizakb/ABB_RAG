@@ -1,10 +1,10 @@
-# backend/rag/app/chunking.py
+# backend/rag/rag/chunking.py
 from __future__ import annotations
 
 from typing import NamedTuple
 
 import tiktoken
-from contracts.models import Document
+from shared.contracts import Document
 
 CHUNK_TOKENS = 600
 CHUNK_OVERLAP = 80

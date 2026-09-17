@@ -16,8 +16,8 @@ services:
   rag:
     build: { context: ., dockerfile: backend/rag/Dockerfile }
     restart: unless-stopped
-    # The only service that reads OPENAI_API_KEY (backend/rag/app/config.py,
-    # backend/rag/app/embedder.py, generate.py) -- so it is the only one that
+    # The only service that reads OPENAI_API_KEY (backend/rag/rag/config.py,
+    # backend/rag/rag/embedder.py, generate.py) -- so it is the only one that
     # gets it, and `:?` fails the whole `up` fast, before any container starts,
     # if a reviewer forgot to paste it into .env.
     environment:
@@ -31,7 +31,7 @@ services:
   chat:
     build: { context: ., dockerfile: backend/chat/Dockerfile }
     restart: unless-stopped
-    # No OPENAI_API_KEY here -- backend/chat/app/config.py has no such field
+    # No OPENAI_API_KEY here -- backend/chat/chat/config.py has no such field
     # and grep confirms nothing under backend/chat reads it (README's
     # key-isolation note). It only ever needs the DB and rag's internal URL.
     environment:

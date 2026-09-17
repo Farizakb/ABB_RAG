@@ -1,4 +1,4 @@
-# backend/rag/app/retrieval.py
+# backend/rag/rag/retrieval.py
 from __future__ import annotations
 
 import re
@@ -6,11 +6,11 @@ import time
 from collections.abc import Collection
 from typing import Any, NamedTuple
 
-from contracts.models import Fact, Source
+from shared.contracts import Fact, Source
 
-from app.config import settings
-from app.db import get_conn
-from app.embedder import Embedder
+from rag.config import settings
+from rag.db import get_conn
+from rag.embedder import Embedder
 
 HOST = "https://abb-bank.az"
 

@@ -6,9 +6,9 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.embedder import FakeEmbedder
-from app.generate import PROMPT_VERSION, answer, build_prompt
-from contracts.models import Source
+from rag.embedder import FakeEmbedder
+from rag.generate import PROMPT_VERSION, answer, build_prompt
+from shared.contracts import Source
 
 
 class FakeClient:

@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 
 from abb_scraper.extract import Block
-from contracts.models import Fact
+from shared.contracts import Fact
 
 EXTRACTOR_VERSION = 1
 MAX_FRAGMENT_CHARS = 40  # a stat block is a fragment, not a sentence

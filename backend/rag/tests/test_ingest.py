@@ -2,12 +2,12 @@
 from datetime import timedelta
 from typing import Any
 
-import app.db as db_module
 import psycopg
 import pytest
-from app.embedder import FakeEmbedder
-from app.ingest import STALE_PROCESSING_AFTER, ingest_corpus
-from contracts.models import Corpus, Document, Fact
+import rag.db as db_module
+from rag.embedder import FakeEmbedder
+from rag.ingest import STALE_PROCESSING_AFTER, ingest_corpus
+from shared.contracts import Corpus, Document, Fact
 
 
 def corpus(n: int = 2) -> Corpus:

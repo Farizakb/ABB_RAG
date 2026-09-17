@@ -8,15 +8,24 @@ select = ["E", "F", "I", "UP", "B", "SIM", "PTH", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-# Only paths that exist today. evals/ has no directory yet -- add it back into
-# this list once it exists so it stays covered under --strict (mypy errors on
-# a nonexistent path in `files`, so it can't be listed pre-emptively).
-files = ["scripts", "backend"]
+files = ["scripts", "backend", "evals"]
 ignore_missing_imports = true
+# rag/conftest.py and chat/conftest.py both sit directly under their service
+# root with no __init__.py, so both resolve to the same bare module name
+# ("conftest") once rag/ and chat/ are each checked as their own package
+# root -- excluded rather than typed, since pytest already owns their contract.
+exclude = ["^backend/(rag|chat)/conftest\\.py$"]
 
 [tool.pytest.ini_options]
-# One bare `pytest` run can't work: backend/rag/app and backend/chat/app are
-# both top-level package `app`. make test / CI run pytest per project instead
-# (see Makefile / .github/workflows/ci.yml), so no shared testpaths/rootdir
-# assumption is made here.
-addopts = "-q"
+# importlib import mode: rag/rag and chat/chat are both editable-installed
+# packages with distinct names now, but tests still live in per-project
+# `tests/` directories with no `__init__.py`, so importlib avoids relying on
+# sys.path insertion to keep them apart.
+addopts = "-q --import-mode=importlib"
+testpaths = [
+    "backend/shared/tests",
+    "backend/scraper/tests",
+    "backend/rag/tests",
+    "backend/chat/tests",
+    "evals/tests",
+]

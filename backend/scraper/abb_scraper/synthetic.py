@@ -7,8 +7,8 @@ import hashlib
 import json
 from datetime import date
 
-from contracts.models import Document
 from selectolax.parser import HTMLParser
+from shared.contracts import Document
 
 HOST = "https://abb-bank.az"
 FAR_FUTURE = date(9999, 12, 31)

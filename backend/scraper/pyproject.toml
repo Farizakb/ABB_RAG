@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "abb-scraper"
@@ -20,5 +20,5 @@ dependencies = [
 [project.scripts]
 abb-scrape = "abb_scraper.cli:app"
 
-[tool.hatch.build.targets.wheel]
+[tool.setuptools]
 packages = ["abb_scraper"]

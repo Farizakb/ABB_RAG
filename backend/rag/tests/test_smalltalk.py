@@ -10,8 +10,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.embedder import FakeEmbedder
-from app.generate import answer
+from rag.embedder import FakeEmbedder
+from rag.generate import answer
 
 
 class FakeClient:
@@ -209,7 +209,7 @@ def test_bank_question_intent_is_unaffected_by_the_new_field(seeded_corpus: str,
 def test_claim_lexicon_matches_whole_english_words_and_az_ru_stems() -> None:
     """English entries are whole-word ("rate" must not fire on "generate",
     "fee" on "coffee"); az/ru entries are stems that keep their suffixes."""
-    from app.generate import _CLAIM_PATTERN
+    from rag.generate import _CLAIM_PATTERN
 
     for benign in (
         "I can help you with separate questions about cards.",

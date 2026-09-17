@@ -5,21 +5,21 @@ from datetime import timedelta
 from typing import Any
 
 import pytest
-from app.embedder import FakeEmbedder
-from app.ingest import STALE_PROCESSING_AFTER, ingest_corpus
-from app.main import app
-from contracts.models import Corpus, Document
 from fastapi.testclient import TestClient
+from rag.embedder import FakeEmbedder
+from rag.ingest import STALE_PROCESSING_AFTER, ingest_corpus
+from rag.main import app
+from shared.contracts import Corpus, Document
 
 client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
 def _fake_embedder(monkeypatch: pytest.MonkeyPatch) -> None:
-    """app.routes.get_embedder is the only seam -- patch it so this
+    """rag.routes.get_embedder is the only seam -- patch it so this
     module never calls OpenAI and never trips ingest_corpus's dimension check
     against the vector(8) test schema (the production embedder is 1536-dim)."""
-    monkeypatch.setattr("app.routes.get_embedder", lambda: FakeEmbedder(dim=8))
+    monkeypatch.setattr("rag.routes.get_embedder", lambda: FakeEmbedder(dim=8))
 
 
 def _corpus(content_hash: str = "sha256:a") -> Corpus:
@@ -127,7 +127,7 @@ def test_ingest_failure_is_recorded_only_on_the_matching_model_row(
         (c.corpus_id, other.model),
     )
 
-    monkeypatch.setattr("app.routes.get_embedder", lambda: BrokenEmbedder())
+    monkeypatch.setattr("rag.routes.get_embedder", lambda: BrokenEmbedder())
     r = client.post("/api/v1/corpora", json={"corpus": c.model_dump(mode="json")})
     assert r.status_code == 202
 
@@ -146,7 +146,7 @@ def test_get_status_reads_only_the_matching_model_row(db: Any) -> None:
     different models, it could return the wrong one. Plant two
     rows with the SAME content_hash and DIFFERENT embedding_model, in
     distinguishable states, and assert the response matches the row for the
-    model app.routes.get_embedder() returns (FakeEmbedder(dim=8), model
+    model rag.routes.get_embedder() returns (FakeEmbedder(dim=8), model
     'fake-embedder' per the autouse fixture above)."""
     matching_model = "fake-embedder"
     other_model = "other-model"

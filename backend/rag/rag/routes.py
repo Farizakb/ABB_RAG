@@ -1,17 +1,17 @@
-# backend/rag/app/routes.py
+# backend/rag/rag/routes.py
 from __future__ import annotations
 
 import logging
 
-from contracts.models import AnswerResponse, Corpus, CorpusStatus
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
+from shared.contracts import AnswerResponse, Corpus, CorpusStatus
 
-from app.db import get_conn
-from app.embedder import Embedder, OpenAIEmbedder
-from app.generate import OpenAIClient
-from app.generate import answer as generate_answer
-from app.ingest import STALE_PROCESSING_AFTER, ingest_corpus
+from rag.db import get_conn
+from rag.embedder import Embedder, OpenAIEmbedder
+from rag.generate import OpenAIClient
+from rag.generate import answer as generate_answer
+from rag.ingest import STALE_PROCESSING_AFTER, ingest_corpus
 
 log = logging.getLogger("rag")
 router = APIRouter(prefix="/api/v1")
