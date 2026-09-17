@@ -255,7 +255,7 @@ def test_a_lexical_only_match_can_reach_the_prompt(
 def test_a_lexically_favoured_document_can_outrank_a_higher_dense_score(
     db: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Fix round 1: the property the old re-sort-by-score destroyed. FakeEmbedder
+    """A lexically-favoured document must outrank a higher dense score. FakeEmbedder
     gives the car-insurance document a higher raw dense score (0.60) than the
     telephone-banking one (0.33) for the query "telefon" -- verified directly
     against FakeEmbedder(dim=8). Despite that, the telephone-banking document

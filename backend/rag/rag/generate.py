@@ -280,7 +280,7 @@ def _looks_advisory(question: str) -> bool:
 
 _CURRENCY_HINTS = ("azn", "₼")
 
-# Fix round 1, F1: a lexical guard cannot be perfect -- "ABB-nin illik haqqı
+# A lexical guard cannot be perfect -- "ABB-nin illik haqqı
 # yoxdur" or "kart pulsuzdur" carry a real claim with no digit, %, currency
 # mark, or URL in sight. These are price/condition words in az (incl. a few
 # common transliterations without diacritics), en and ru. az and ru stems are

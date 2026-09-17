@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
 # has none. Without this, chunking.py's module-level tiktoken.get_encoding()
 # call fetches from openaipublic.blob.core.windows.net on the first cold
 # start, a host unrelated to the OpenAI API the container already calls and
-# one a grader's network policy has no reason to allowlist; it would surface
+# one a restricted network policy (e.g. CI) has no reason to allowlist; it would surface
 # as a confusing hang on first query, not a clean startup failure.
 ENV PYTHONPATH=/install/lib/python3.12/site-packages
 RUN TIKTOKEN_CACHE_DIR=/opt/tiktoken_cache python -c \

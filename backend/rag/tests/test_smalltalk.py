@@ -77,7 +77,7 @@ def test_small_talk_that_leaks_a_url_falls_back_to_refusal(seeded_corpus: str, d
 
 
 def test_small_talk_naming_categories_still_passes(seeded_corpus: str, db: Any) -> None:
-    """Fix round 1, F1: naming what it can help with is not itself a claim."""
+    """Naming what the chatbot can help with is not itself a claim."""
     payload = json.dumps(
         {
             "answer": "Kartlar, kreditlər və depozitlər haqqında suallarınıza kömək edə bilərəm.",
@@ -94,7 +94,7 @@ def test_small_talk_naming_categories_still_passes(seeded_corpus: str, db: Any) 
 def test_small_talk_stating_a_fee_condition_falls_back_to_refusal(
     seeded_corpus: str, db: Any
 ) -> None:
-    """Fix round 1, F1: "Kartın illik haqqı yoxdur" has no digit, %, currency
+    """A statement like "Kartın illik haqqı yoxdur" has no digit, %, currency
     mark, or URL -- only the lexicon guard catches it."""
     payload = json.dumps(
         {
@@ -111,7 +111,7 @@ def test_small_talk_stating_a_fee_condition_falls_back_to_refusal(
 def test_small_talk_stating_a_price_claim_falls_back_to_refusal(
     seeded_corpus: str, db: Any
 ) -> None:
-    """Fix round 1, F1/F2: "kart pulsuzdur" ("the card is free") -- an
+    """A statement like "kart pulsuzdur" ("the card is free") -- an
     Azerbaijani suffix attached directly to the stem, so the guard must match
     "pulsuz" as a substring, not a whole word."""
     payload = json.dumps(
@@ -140,7 +140,7 @@ def test_small_talk_english_price_claim_falls_back_to_refusal(seeded_corpus: str
 
 
 def test_small_talk_over_400_characters_falls_back_to_refusal(seeded_corpus: str, db: Any) -> None:
-    """Fix round 1, F1: a real small-talk reply is short (prompt rule 2 caps
+    """A real small-talk reply is short (prompt rule 2 caps
     it at 3 sentences); an over-length one is where an unlisted claim is most
     likely hiding, so length alone is its own signal -- no claim word needed
     to trigger this test."""

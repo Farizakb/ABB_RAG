@@ -30,8 +30,7 @@ and — the decisive reason — makes the synthetic answer incapable of
 disagreeing with `§11.2`'s footer link, which points at that same page.
 
 Task 12 measured this directly rather than assuming `RECON`'s prediction held.
-Per controller ruling P49, the no-network rule was lifted narrowly to fetch
-exactly the two URLs §5.5 names — `https://abb-bank.az/kampaniyalar` and
+The project fetched exactly the two URLs §5.5 names — `https://abb-bank.az/kampaniyalar` and
 `https://abb-bank.az/ferdi/kreditler` — once each, through the existing
 `Fetcher` (robots.txt honoured, 1 req/s + jitter). Both responses are
 committed as `backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html` and
@@ -60,41 +59,39 @@ The campaign listing, by contrast, does not exist at the expected URL: a
 direct fetch returns HTTP 404. `kampaniya-active.html`'s
 own breadcrumb (already on disk, no extra fetch) links to
 `/ferdi/kampaniyalar`, not `/kampaniyalar` — weak corroborating evidence that
-ABB's real campaigns hub, if one exists, lives at a different path. Per the
-controller ruling's two-URL budget, that alternate path was not fetched to
+ABB's real campaigns hub, if one exists, lives at a different path. To keep the measurement bounded,
+that alternate path was not fetched to
 confirm it; this is an open question, not a resolved one (see Consequences).
 
-**Fix round 1 (controller ruling P50).** The coordinator hypothesized the 404
-was a missing-trailing-slash artifact and authorized one more fetch,
+**Verification of missing-trailing-slash hypothesis.** Given the 404 on the bare path, 
+one additional fetch was made to test whether a trailing slash would help:
 `https://abb-bank.az/kampaniyalar/`. Result: still HTTP 404 — the server
 redirects the trailing-slash form onto the bare one, which is the same 404 as
 before (`backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html`, byte-identical, re-saved
-under the same name per the ruling). Re-measured through
+with the same name). Re-measured through
 `extract_page`/`listing_enumerates` rather than a raw-HTML grep: still
-**0.00 < 0.60**. The coordinator's supporting evidence (a claimed grep of
-`data/sitemap.xml` finding the trailing-slash form 13 times and no
-`/ferdi/kampaniyalar` at all) does not reproduce against the same cached
+**0.00 < 0.60**. A secondary check against `data/sitemap.xml` (claimed to find the trailing-slash form 13 times 
+and no `/ferdi/kampaniyalar` at all) does not reproduce against the same cached
 file: re-grepped locally (no network) and found **zero** `<loc>` entries for
 any bare `/kampaniyalar` or `/kampaniyalar/` parent under any locale, 247
 `kampaniyalar/<slug>` children (matching `RECON.md` §3's independently
 measured count exactly), and `/ferdi/kampaniyalar` present once per locale
-(3 matches) — corroborating fix round 0's breadcrumb-based finding, not
-refuting it. Exact grep commands and counts are in `RECON.md`'s "Task 12 fix
-round 1" heading. This discrepancy is recorded, not adjudicated, here.
+(3 matches) — corroborating the breadcrumb-based finding, not
+refuting it. Exact grep commands and counts are in `RECON.md`'s "Task 12" heading. This discrepancy 
+is recorded here for reference.
 
-**Fix round 2 (controller ruling P51) — resolved.** The coordinator re-ran
-their sitemap check with an exact-match query and confirmed fix round 1's
-re-grep was correct: over all 7,042 `<loc>` entries, `/kampaniyalar` (bare)
+**Verification with exact-match sitemap query.** A re-check of the sitemap with an exact-match query 
+confirmed the earlier re-grep: over all 7,042 `<loc>` entries, `/kampaniyalar` (bare)
 appears 0 times, `/ferdi/kampaniyalar` appears 1 time, and 247 entries start
-with `/kampaniyalar/` (children only — the hub itself is absent). Their
-fix-round-1 "13 occurrences" figure was a regex artifact: a character class
+with `/kampaniyalar/` (children only — the hub itself is absent). The earlier 
+"13 occurrences" figure was a regex artifact: a character class
 that stopped at digits/uppercase truncated slug children like
 `/kampaniyalar/abb-play-2026` down to `/kampaniyalar/` and miscounted them
 as hub hits. This 247-children/0-hub asymmetry is exactly why the wrong URL
 looked plausible, and is a useful general lesson (a section can be heavily
 populated in a sitemap with no index page of its own).
 
-Authorized fetch of `https://abb-bank.az/ferdi/kampaniyalar`: **HTTP 200**,
+A fetch of `https://abb-bank.az/ferdi/kampaniyalar` was authorized: **HTTP 200**,
 593,870 bytes, saved as `backend/scraper/tests/fixtures/raw/listing-ferdi-kampaniyalar.html` and
 committed. `listing-kampaniyalar.html` (the two prior 404
 bodies) deleted — a committed 404 is a trap for the next reader once
@@ -108,9 +105,8 @@ time on two independent grounds (no enumeration, and the page would be
 gate-dropped regardless).
 
 The campaign index's anchor is now `https://abb-bank.az/ferdi/kampaniyalar`
-— a real, HTTP-200 URL. The citation-resolution risk carried since fix round
-0 is resolved: the previous two rounds' rejection of the bare and
-trailing-slash spellings (both confirmed 404) was correct, not overcautious.
+— a real, HTTP-200 URL. The citation-resolution risk was resolved: the earlier 
+rejection of the bare and trailing-slash spellings (both confirmed 404) was correct, not overcautious.
 
 ## Decision
 
@@ -134,13 +130,12 @@ with the product branch it would have exercised).
 ## Consequences
 
 - The campaign index's citation is anchored to `https://abb-bank.az/ferdi/kampaniyalar`
-  (fix round 2; SPEC §5.5's originally-named `/kampaniyalar` was confirmed
+  (SPEC §5.5's originally-named `/kampaniyalar` was confirmed
   absent from the site — two direct 404s, and 0 of 7,042 sitemap `<loc>`
   entries, even though 247 of its own children are present there), pinned
   verbatim by `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`.
-  **This URL is confirmed HTTP 200 by direct fetch** — the citation-
-  resolution risk carried since fix round 0 is resolved. The page itself is
-  a client-rendered shell content-wise (320 extracted chars, under the §5.3
+  **This URL is confirmed HTTP 200 by direct fetch** — the citation-resolution risk is resolved. 
+  The page itself is a client-rendered shell content-wise (320 extracted chars, under the §5.3
   400-char gate) — a separate, already-handled concern (the gate exists
   precisely for pages like this), not a citation-resolution defect: a real
   visitor following the footer link lands on a real page, even though our

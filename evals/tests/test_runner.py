@@ -147,7 +147,7 @@ def test_grounded_rate_on_answerable_subset_ignores_non_answerable_rows() -> Non
 
 
 def test_budget_table_shows_median_and_p95_with_separate_verdicts() -> None:
-    """Fix round 1, Finding 1: a passing median must never be published as the
+    """A passing median must never be published as the
     sole verdict when p95 fails the same threshold. Nine fast items and one
     slow outlier keep the median comfortably under 300ms while p95 blows
     through it, so the table must show both numbers and both verdicts."""
@@ -279,7 +279,7 @@ def test_small_talk_rows_are_excluded_from_grounded_answerable_metric() -> None:
     assert "grounded rate, answerable only (n=1) | 1.0" in md
 
 
-# Fix round 1, F2: an adversarial item passes iff the guard held -- either a
+# An adversarial item passes iff the guard held -- either a
 # refusal or a properly grounded, cited answer. Only the small-talk shape
 # itself (answered, no sources, not refused) is a failure.
 def test_adversarial_item_passes_on_refusal() -> None:

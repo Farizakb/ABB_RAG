@@ -100,7 +100,7 @@ ship. No row flips the other way; nothing is gained by excluding stubs here.
 **The pre-committed rule's own logic now agrees with the shipped configuration.**
 Hit@5 drops when stubs are excluded, so the rule says stubs stay in — the same
 conclusion the running system already implements, with no reversal to report. This
-strengthens ruling P153: `/atmler` being itself a stub is not an edge case to
+confirms the finding: `/atmler` being itself a stub is not an edge case to
 special-case around, it is the reason stub exclusion is rejected.
 `backend/rag/rag/retrieval.py` is not modified.
 

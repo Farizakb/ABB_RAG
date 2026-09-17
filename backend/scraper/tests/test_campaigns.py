@@ -32,12 +32,12 @@ def test_active_when_end_date_is_in_the_future() -> None:
 
 
 def test_active_when_valid_to_is_exactly_today() -> None:
-    """Fix round 1 finding: `end >= today` had no test pinning its boundary --
-    mutating it to `end > today` left the full suite green. An offer whose
+    """The boundary condition `end >= today` must be correct --
+    mutating it to `end > today` would silently drop valid offers. An offer whose
     last valid day is today (2026-09-14, the same injected TODAY used
     throughout this file, not `date.today()`) must still read as active: it
     is still valid on its last day, and flipping it to expired a day early
-    is exactly the silent-drop risk invariant 9 exists to prevent."""
+    is exactly the silent-drop risk the boundary check exists to prevent."""
     c = classify("01.09.2026 - 14.09.2026", TODAY)
     assert c.status == "active" and c.valid_to == TODAY
 

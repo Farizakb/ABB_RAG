@@ -11,7 +11,7 @@ LlamaIndex, or similar retrieval-orchestration framework anywhere in this codeba
 deliberate omission, not an oversight, and it is worth stating why given how default a LangChain
 import has become in RAG tutorials and starter templates.
 
-This submission's actual thesis — the thing meant to distinguish it from "a working chatbot" — is
+This project's actual thesis — the thing meant to distinguish it from "a working chatbot" — is
 the set of decisions made by measurement: whether a lexical retrieval channel earns its place
 (hit@5, fused vs. dense-only), whether stub pages help or hurt, where the retrieval floor sits,
 which embedding model wins, how citation resolution and the refusal contract are enforced. Every
@@ -20,7 +20,7 @@ one of those decisions lives in code a reviewer can open and read in a few lines
 refusal logic, `ingest.py`'s idempotency check. A framework's retriever/chain abstractions exist
 precisely to hide exactly this kind of plumbing behind a configurable interface — which is a
 reasonable thing to want in a system whose plumbing is not the point, and the wrong thing to want
-in a system whose plumbing **is** the point being demonstrated to a technical panel.
+in a system whose plumbing **is** the point being demonstrated.
 
 There is also a concrete, non-rhetorical cost: LangChain's retriever/chain interfaces are built
 around a general notion of "documents" and "chains" that does not natively express this system's
