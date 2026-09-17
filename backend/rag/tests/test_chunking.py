@@ -21,7 +21,7 @@ def _many_lines(n: int) -> str:
     lines with occasional longer ones. Measured across all 8,274 non-empty
     lines of the real 243-document corpus: p50 30 chars, p90 157 chars, p99
     455 chars, max 1,043 chars, and zero lines exceed ~600 tokens. A single
-    no-newline blob (the brief's original test input) yields exactly one
+    no-newline blob (the original test input) yields exactly one
     section and can never exercise the packing loop -- real documents are
     block-per-line, which is what this mirrors.
     """

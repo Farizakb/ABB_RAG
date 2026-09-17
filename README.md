@@ -39,15 +39,15 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Setup | `make setup` | `cp .env.example .env` (then edit `OPENAI_API_KEY`) |
 | Start the stack | `make up` | `docker compose up -d --build --wait` |
 | Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
-| Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
+| Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py data/corpus_sample.json` |
 | Run tests | `make test` | `pytest`; `cd frontend && npm test -- --run` |
-| Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
+| Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py data/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
 | DB inspector | — | `docker compose exec db psql -U abb abb` |
 | Tail logs | `make logs` | `docker compose logs -f` |
 | Container status | `make ps` | `docker compose ps` |
 
-**A reviewer does not need to run the scraper.** `fixtures/corpus_sample.json` is the real, already
+**A reviewer does not need to run the scraper.** `data/corpus_sample.json` is the real, already
 scraped artifact — the file `make demo`/`make ingest` loads and `evals/report.md` was generated
 against. To load a different corpus: open the Data screen and drop a `corpus_<ts>.json` file
 produced by the scraper — the browser validates it, writes it to `localStorage`, and **Process
@@ -55,7 +55,7 @@ dataset** sends it to `rag`, which chunks, embeds and writes to Postgres while t
 until the corpus reaches `ready`.
 
 **Docker only?** Run `docker compose up -d --build --wait`, open `http://localhost:8080`, and drop
-`fixtures/corpus_sample.json` on the Data screen (Analytics then starts empty instead of seeded).
+`data/corpus_sample.json` on the Data screen (Analytics then starts empty instead of seeded).
 
 Opening `http://localhost:8080` after `make demo`: the Data screen already shows a processed
 corpus ("already ingested" fast path), the Chat tab is unlocked, and Analytics is populated with
@@ -78,33 +78,21 @@ the live OpenAI API and costs real money — do not re-run it casually; `evals/r
 
 ---
 
-## Requirements coverage
+## Feature coverage
 
-The binding brief is `ABB_DS_SW_CASE_STUDY.docx` (git-ignored; the client's original text). This
-table restates each distinct requirement in it and says where it is covered and how that was
-verified.
-
-| Brief requirement | Where | How verified |
+| Feature | Where | How verified |
 |---|---|---|
-| Parse the official ABB website and extract all textual content | `backend/scraper` (CLI producing `corpus_<ts>.json`) | Run against the live site; verified live |
-| Let users upload the extracted data and store it in the browser's local storage | Data screen file picker; `localStorage` keys `abb.corpus` / `abb.corpus.manifest` | JSON-schema validated in the browser; verified live ([ADR-0001](docs/adr/0001-localstorage-and-the-vector-index.md)) |
-| Backend service interacting with an OpenAI LLM | `backend/rag` | `OPENAI_API_KEY` is read only in `backend/rag/*`, confirmed by grep |
-| Format extracted data into a vector DB compatible with OpenAI | `db/migrations/001_schema.sql`, `002_hybrid_lexical.sql`; Postgres 16 + pgvector | `text-embedding-3-small`, cosine similarity ([ADR-0002](docs/adr/0002-pgvector-over-a-dedicated-vector-database.md)) |
+| Parse the ABB website and extract page content | `backend/scraper` (CLI producing `corpus_<ts>.json`) | Run against the live site; verified live |
+| Upload extracted data and store it in the browser | Data screen file picker; `localStorage` keys `abb.corpus` / `abb.corpus.manifest` | JSON-schema validated in the browser; verified live ([ADR-0001](docs/adr/0001-localstorage-and-the-vector-index.md)) |
+| Backend service calling an OpenAI LLM | `backend/rag` | `OPENAI_API_KEY` is read only in `backend/rag/*`, confirmed by grep |
+| Vector index compatible with OpenAI embeddings | `db/migrations/001_schema.sql`, `002_hybrid_lexical.sql`; Postgres 16 + pgvector | `text-embedding-3-small`, cosine similarity ([ADR-0002](docs/adr/0002-pgvector-over-a-dedicated-vector-database.md)) |
 | Chat interface once processing succeeds | Chat tab | Gated on ingest status reaching `ready`; verified live |
-| Answers stay within the context of the provided ABB information | [Grounding contract](#grounding-contract-cited-or-refused) | `evals/report.md`; verified live with a grounded answer and a refusal, both citing sources |
-| Microservice architecture for question handling and response generation, JSON | `chat` and `rag`, JSON over HTTP | Running containers; JSON responses observed in the UI ([ADR-0003](docs/adr/0003-two-services.md)) |
-| Store questions, answers and timestamps in a database | `app.interactions` | Verified live via a read-only `psql` count query |
-| Chart library visualising stored questions and answers | Analytics screen, Recharts | Shipped as two Recharts charts (`Questions over time`, `Answered versus refused`) plus two plain-HTML tables ([Analytics](#analytics)); verified live |
+| Answers stay grounded in the ingested corpus | [Grounding contract](#grounding-contract-cited-or-refused) | `evals/report.md`; verified live with a grounded answer and a refusal, both citing sources |
+| Microservice split: question handling vs. response generation | `chat` and `rag`, JSON over HTTP | Running containers; JSON responses observed in the UI ([ADR-0003](docs/adr/0003-two-services.md)) |
+| Persist questions, answers and timestamps | `app.interactions` | Verified live via a read-only `psql` count query |
+| Chart questions and answers over time | Analytics screen, Recharts | Two Recharts charts (`Questions over time`, `Answered versus refused`) plus two plain-HTML tables ([Analytics](#analytics)); verified live |
 | Package the app and its dependencies into Docker images | Four Dockerfiles (`frontend`, `backend/scraper`, `backend/chat`, `backend/rag`) | `docker compose up` running healthy |
-| Well-documented implementation choices | This README, six ADRs (`docs/adr/0001`–`0006`), `docs/error-analysis.md` | — |
-| Share all code within a given time interval | Self-contained repo, `fixtures/corpus_sample.json` committed, `make demo` | Runnable end to end from a fresh clone |
-| Be prepared for a code walkthrough and demo | `docs/demo-script.md`, `scripts/seed_demo.py` | Rehearsed as a read-through against source material; not yet timed as a live end-to-end run (see that document's own note) |
-
-**Evaluation criteria** (the brief's own grading axes): Functionality → `evals/report.md` and
-[Measured results](#measured-results) below; Code Quality → `ruff`/`mypy` clean, [264 tests
-green](#run-path); Efficiency → the same latency/cost budgets, disclosed misses included; Design →
-a ledger-style direction (palette, tabular numerals, one animation); Documentation → this file plus
-six ADRs plus `docs/error-analysis.md`.
+| Documented implementation choices | This README, six ADRs (`docs/adr/0001`–`0006`), `docs/error-analysis.md` | — |
 
 ---
 
@@ -143,16 +131,16 @@ flowchart TB
 ```
 
 - **The scraper is not in the request path.** It is a run-once CLI plus a `profiles: ["scraper"]`
-  Compose service — no demo should depend on a live crawl against the client's production site.
+  Compose service — no demo should depend on a live crawl against ABB's production site.
 - **`rag` is the only service that ever holds `OPENAI_API_KEY`**, in application code and in its
   container environment (`docker-compose.yml`'s `rag`/`chat` `environment:` blocks).
 - **`chat` never reads `rag.*` and `rag` never reads `app.*`.** One database, two schemas, no
   cross-schema reads.
 - **The browser never calls `rag` directly**, except through nginx's `/api/v1/corpora` route;
   `rag`'s `/answer` is internal and publishes no port.
-- **The `web → chat → rag` hop is the microservice seam R8 asks for.** At the corpus's current
-  size (736 chunks) a single service would be simpler and faster to ship; the split exists because
-  the brief asks for it, and because request-and-record concerns change for product reasons while
+- **The `web → chat → rag` hop is a deliberate microservice split, not an accident of scale.** At
+  the corpus's current size (736 chunks) a single service would be simpler and faster to ship;
+  the split exists because request-and-record concerns change for product reasons while
   retrieval-and-generation concerns change for model reasons. See
   [ADR-0003](docs/adr/0003-two-services.md).
 
@@ -365,7 +353,7 @@ and it would need eval coverage this build doesn't have yet.
 
 ---
 
-*(This document was written against `feat/abb-assistant` HEAD `5465255` and the shipping corpus
+*(This document was written against the shipping corpus
 `90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`, 280 documents / 736 chunks.
 Numbers not cited to `evals/report.md`, an ADR, or `docs/error-analysis.md` are not claimed.
 Full excluded-sections list and hand-authored pointers: [docs/corpus-scope.md](docs/corpus-scope.md).)*

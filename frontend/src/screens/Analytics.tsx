@@ -62,8 +62,8 @@ export function Analytics() {
         </LineChart>
       </ResponsiveContainer>
 
-      {/* Split by refusal class, which is what ties this screen back to R7
-          and proves the grounding contract is real. refused_unsafe is part
+      {/* Split by refusal class, which is what makes this chart prove the
+          grounding contract is real, not just a volume chart. refused_unsafe is part
           of the same series but never appears in the demo seed (both
           refusal classes deliberately seeded are out_of_scope and advisory
           -- scripts/seed_demo.py), so it isn't plotted as its own bar here. */}

@@ -179,7 +179,7 @@ def test_build_prompt_with_no_sources_still_builds_a_valid_prompt() -> None:
     """Task D: the refusal path (`retrieve()` returns `sources == []`, so
     `texts == {}` by construction) must not crash `build_prompt` -- it is
     never called on that path today (`answer()` refuses before reaching it),
-    but the brief pins it directly since a future caller may not short-circuit
+    but is pinned directly since a future caller may not short-circuit
     the same way."""
     prompt = build_prompt("sual", [], {})
     assert "QUESTION: sual" in prompt

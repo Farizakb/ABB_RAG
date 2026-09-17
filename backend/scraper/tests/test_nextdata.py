@@ -7,7 +7,7 @@ from pathlib import Path
 from abb_scraper.extract import FAQ_TAG, Block, content_blocks, extract_page, faq_blocks
 from abb_scraper.nextdata import faq_pairs, flight_payload
 
-FIXTURES = Path("fixtures/raw")
+FIXTURES = Path("backend/scraper/tests/fixtures/raw")
 NAGD_KREDIT = "/ferdi/kreditler/nagd-kredit"
 KREDITLER = "/ferdi/kreditler"
 PATH = "ferdi/test"
@@ -181,7 +181,7 @@ def test_faq_answer_missing_from_dom_is_still_recovered_even_when_question_is_re
     question-keyed skip mistook "question already in DOM" for "pair already
     in DOM" and discarded the pair, answer included: 76 pairs / 25,903 chars
     lost across 19 pages, every one of them losing every answer it had
-    (task-14c-fix2-brief.md, measured 2026-09-14 on the 550-file raw cache).
+    (measured 2026-09-14 on the 550-file raw cache).
     """
     html = push(record(item("Nə vaxt bağlanır?", "<p>Ayın sonunda.</p>")))
     dom = [Block("Nə vaxt bağlanır?", "p")]  # question rendered server-side; answer is not
@@ -212,7 +212,7 @@ def test_faq_answer_prefix_rendered_in_dom_is_still_recovered() -> None:
     longer. A prefix-based dedupe (the shipped fix-2 rule) mistakes that
     teaser for proof the whole answer is already rendered and silently drops
     the pair: 3 real pages lost their only copy of a genuine answer this way
-    (task-14c-fix3-brief.md, measured 2026-09-14 on the 550-file raw cache).
+    (measured 2026-09-14 on the 550-file raw cache).
     This is the case that is broken today.
     """
     answer = (

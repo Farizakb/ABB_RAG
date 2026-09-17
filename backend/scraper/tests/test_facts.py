@@ -6,7 +6,7 @@ from pathlib import Path
 from abb_scraper.extract import Block, content_blocks
 from abb_scraper.facts import extract_facts, normalize_label, reassemble
 
-RAW = Path("fixtures/raw")
+RAW = Path("backend/scraper/tests/fixtures/raw")
 
 
 def load(name: str) -> str:
@@ -110,10 +110,10 @@ def test_normalize_label_leaves_other_azerbaijani_letters_intact() -> None:
     assert len(normalized) == len(raw.lower())
 
 
-def test_real_fixture_label_carries_trailing_punctuation_the_brief_missed() -> None:
+def test_real_fixture_label_carries_trailing_punctuation_the_stat_list_missed() -> None:
     """nagd-kredit.html's actual collateral label block is
     `"Zamin tələb olunmur."`, period and all -- not the bare
-    `"Zamin tələb olunmur"` the brief's hand-built STAT list used. An exact
+    `"Zamin tələb olunmur"` the hand-built STAT list used. An exact
     `LABELS.get(label.lower().strip())` lookup, run against this real block,
     misses it and silently drops the collateral fact. Proven against the
     real fixture via `content_blocks`, not a hand-typed string, per the

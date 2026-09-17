@@ -183,7 +183,7 @@ aside[aria-label="Sources"] { animation: ledger-resolve 280ms ease-out; }
      the breakpoint, drop back to auto layout: Time/Outcome/Latency stay
      on one line at their natural width, Question wraps normally, and
      .table-scroll's horizontal scroll is the fallback if that still
-     doesn't fit -- exactly the escape hatch the brief allows. */
+     doesn't fit -- an accepted fallback, not a failure state. */
   /* width: auto overrides the global `table { width: 100% }` -- with that
      still in force, auto layout has no room to grow into and instead
      crushes the one wrapping column below its own min-content width,

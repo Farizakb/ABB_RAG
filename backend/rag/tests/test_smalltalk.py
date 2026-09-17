@@ -159,8 +159,8 @@ def test_small_talk_over_400_characters_falls_back_to_refusal(seeded_corpus: str
 def test_small_talk_labelled_reply_confirming_a_free_card_is_refused(
     seeded_corpus: str, db: Any
 ) -> None:
-    """Fix round 1, F2: the exact case named in the fix brief -- an
-    LLM-labelled small_talk reply that answers a disguised bank question."""
+    """The exact leak case this guard targets: an LLM-labelled small_talk
+    reply that answers a disguised bank question."""
     payload = json.dumps(
         {
             "answer": "Bəli, kart pulsuzdur.",

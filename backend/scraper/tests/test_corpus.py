@@ -39,7 +39,7 @@ def non_pointer_docs(corpus: Corpus) -> list[Document]:
     return [d for d in corpus.documents if d.url not in POINTER_URLS]
 
 
-# ------------------------------------------------------------- brief's own tests
+# ------------------------------------------------------------- specification-example tests
 
 
 def test_expired_campaign_never_reaches_the_corpus() -> None:

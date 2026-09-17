@@ -8,10 +8,10 @@ recommendation was overridden.
 
 ## Context
 
-The brief's microservice requirement sits under "Conversational Interface" and names exactly two
-activities: "microservice architecture for question handling and response generation using JSON
-format." That sentence names the two things it asks to be separated. The seam this build draws is
-the one the sentence names, not a seam invented to look more distributed than the brief asked for.
+The microservice requirement names exactly two activities: "microservice architecture for question
+handling and response generation using JSON format." That sentence names the two things it asks
+to be separated. The seam this build draws is the one the sentence names, not a seam invented to
+look more distributed than the requirement asked for.
 
 - **`chat` owns question handling.** Request validation, session id, PII redaction at log-write,
   writing every interaction to the database, and serving analytics over that record.
@@ -30,12 +30,13 @@ the one the sentence names, not a seam invented to look more distributed than th
 size this build actually ships — 736 chunks — a single service would be simpler to build, deploy
 and reason about, and would very likely also be faster end-to-end, with no cross-service HTTP hop
 between `chat` and `rag` on every question. The split exists for two reasons that are not "it
-scales better": the brief asks for it by name, and the two halves change for genuinely different
-reasons even at this size — request-and-record concerns (rate limiting, redaction, analytics
-aggregation) change for product reasons, while retrieval-and-generation concerns (embedding model,
-fusion weights, prompt rules) change for model reasons. A design that defends microservices on
-performance or scale grounds at 736 chunks would be wrong; a design that names the phase-dependence
-out loud and ships the seam the brief asked for anyway is the honest answer.
+scales better": the requirement asks for it by name, and the two halves change for genuinely
+different reasons even at this size — request-and-record concerns (rate limiting, redaction,
+analytics aggregation) change for product reasons, while retrieval-and-generation concerns
+(embedding model, fusion weights, prompt rules) change for model reasons. A design that defends
+microservices on performance or scale grounds at 736 chunks would be wrong; a design that names
+the phase-dependence out loud and ships the seam the requirement asked for anyway is the honest
+answer.
 
 ## Decision
 
@@ -47,8 +48,9 @@ is reachable only from `chat`'s container on the compose network.
 
 ## Consequences
 
-- A reviewer auditing "does this satisfy R8" finds exactly the two services the brief's sentence
-  names, doing exactly the two things it names, with no third service diluting the answer.
+- A reviewer auditing "does this satisfy the microservice requirement" finds exactly the two
+  services the requirement's sentence names, doing exactly the two things it names, with no third
+  service diluting the answer.
 - The `chat → rag` hop is real network latency on every question — visible in the eval report's
   own latency table, and part of why the end-to-end latency budget is missed at p95 (see the
   README's measured-numbers section). This is the direct, disclosed cost of the split, not a
@@ -63,9 +65,9 @@ is reachable only from `chat`'s container on the compose network.
 ## Rejected
 
 - **A modulith** (one service, both concerns as internal modules). Simpler to build and probably
-  faster to answer a question, but it does not satisfy R8's literal ask for a microservice split
-  between question handling and response generation — a candidate choosing this at this scale
-  would be optimising for an outcome the brief did not request.
+  faster to answer a question, but it does not satisfy the requirement's literal ask for a
+  microservice split between question handling and response generation — choosing this at this
+  scale would be optimising for an outcome the requirement did not request.
 - **Three services, with ingestion split out from `rag`** (`ingest` + `chat` + `rag`, or similar).
   This divides one data lifecycle — a document's path from scrape to embedded chunk — across two
   owners for no benefit: nothing reads ingested-but-not-yet-searchable data independently of the
@@ -73,7 +75,7 @@ is reachable only from `chat`'s container on the compose network.
   no reader on the other side of the boundary.
 - **The `ingestion` + `chat` seam** (this repo's own earlier plan, `CUT_LIST.md` item A1, and the
   seam the internal overengineering audit originally recommended). It divides along an axis the
-  brief never names ("ingestion" versus "everything else") while leaving the axis the brief does
-  name — question handling versus response generation — entirely undivided inside "everything
-  else." A reviewer checking R8 against this seam would have to infer the mapping rather than read
-  it off the service names.
+  requirement never names ("ingestion" versus "everything else") while leaving the axis the
+  requirement does name — question handling versus response generation — entirely undivided inside
+  "everything else." A reviewer checking the microservice requirement against this seam would have
+  to infer the mapping rather than read it off the service names.

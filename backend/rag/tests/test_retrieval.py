@@ -117,9 +117,8 @@ def test_each_chunk_of_the_same_document_keeps_its_own_text(
     golden questions plus the known-failing valyuta question: 29 of 46 were
     affected by the old `source_texts()`, which keyed its lookup dict by URL
     -- so when several chunks of the same document ranked in the same top-k
-    (routine: worst case 5 sources sharing 1 distinct text, see
-    task-D-brief.md's table), every chunk but the last-fetched one had its
-    text discarded before the prompt was built.
+    (routine: worst case 5 sources sharing 1 distinct text), every chunk but
+    the last-fetched one had its text discarded before the prompt was built.
 
     Seeds THREE documents, one chunk each, so all three reach the prompt under
     `_best_per_document`, and asserts each source's text is its own -- not

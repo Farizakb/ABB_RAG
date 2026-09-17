@@ -36,7 +36,7 @@ RANK_DEPTH = 100
 STOPWORDS = frozenset(
     """ne nece necedir nedir hansi hansilardir var varmi ucun ile olur olar
     mumkundur bilerem edir daha bir the what is are how can i do does of for and
-    a to in on my me""".split()  # noqa: SIM905 -- brief's exact constant, not a list literal
+    a to in on my me""".split()  # noqa: SIM905 -- exact wordlist as measured, not a list literal
 )
 
 DENSE_DOCS = """

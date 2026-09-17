@@ -7,10 +7,10 @@ SPEC.md
 SPEC_v*.md
 RECON.md
 CUT_LIST.md
-ABB_DS_SW_CASE_STUDY.docx
+*.docx
 
-# NOTE: docs/ itself is deliberately NOT ignored. docs/adr/, docs/error-analysis.md
-# and docs/demo-script.md are deliverables and must ship.
+# NOTE: docs/ itself is deliberately NOT ignored. docs/adr/ and
+# docs/error-analysis.md are deliverables and must ship.
 
 # Subagent-driven-development scratch: ledger, briefs, reports, review packages.
 .superpowers/
@@ -22,10 +22,13 @@ ABB_DS_SW_CASE_STUDY.docx
 
 # --- Crawl cache: regenerable, large, and ABB's content. Never committed. ---
 data/
+!data/corpus_sample.json
+!data/corpus_three_page.json
 
-# NOTE: fixtures/ IS tracked. fixtures/raw/*.html are the gate-captured pages every
-# extraction test asserts against, and fixtures/corpus_sample.json is what lets a
-# reviewer run the app without crawling ABB's production site.
+# NOTE: backend/scraper/tests/fixtures/raw/*.html are the gate-captured pages every
+# extraction test asserts against, tracked despite living under a test tree.
+# data/corpus_sample.json is what lets a reviewer run the app without crawling
+# ABB's production site.
 
 # --- Python ---
 __pycache__/

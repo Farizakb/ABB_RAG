@@ -7,7 +7,7 @@ const corpus = { corpus_version: "1", documents: [{ url: "https://abb-bank.az/a"
 describe("localStorage", () => {
   beforeEach(() => localStorage.clear());
 
-  it("writes the full corpus verbatim, as the brief asks", () => {
+  it("writes the full corpus verbatim", () => {
     saveCorpus(corpus as never, "abc123");
     expect(JSON.parse(localStorage.getItem("abb.corpus")!)).toEqual(corpus);
   });

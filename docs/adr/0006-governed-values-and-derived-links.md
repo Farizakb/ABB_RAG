@@ -34,8 +34,8 @@ Per controller ruling P49, the no-network rule was lifted narrowly to fetch
 exactly the two URLs §5.5 names — `https://abb-bank.az/kampaniyalar` and
 `https://abb-bank.az/ferdi/kreditler` — once each, through the existing
 `Fetcher` (robots.txt honoured, 1 req/s + jitter). Both responses are
-committed as `fixtures/raw/listing-kampaniyalar.html` and
-`fixtures/raw/listing-ferdi-kreditler.html`, so the measurement is
+committed as `backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html` and
+`backend/scraper/tests/fixtures/raw/listing-ferdi-kreditler.html`, so the measurement is
 reproducible offline and is never re-fetched. Full detail, including the
 structural check that ruled out a §5.3 chrome-stripper bug as an alternative
 explanation, is in `RECON.md`'s dated "Task 12" day-two heading.
@@ -56,8 +56,8 @@ bug: its ancestor chain terminates in `footer#footer`, i.e. it is a genuine
 site-wide footer sitemap link, not a body enumeration this listing failed to
 render.
 
-The campaign listing, by contrast, does not exist at the URL SPEC and the
-brief both name: a direct fetch returns HTTP 404. `kampaniya-active.html`'s
+The campaign listing, by contrast, does not exist at the expected URL: a
+direct fetch returns HTTP 404. `kampaniya-active.html`'s
 own breadcrumb (already on disk, no extra fetch) links to
 `/ferdi/kampaniyalar`, not `/kampaniyalar` — weak corroborating evidence that
 ABB's real campaigns hub, if one exists, lives at a different path. Per the
@@ -68,7 +68,7 @@ confirm it; this is an open question, not a resolved one (see Consequences).
 was a missing-trailing-slash artifact and authorized one more fetch,
 `https://abb-bank.az/kampaniyalar/`. Result: still HTTP 404 — the server
 redirects the trailing-slash form onto the bare one, which is the same 404 as
-before (`fixtures/raw/listing-kampaniyalar.html`, byte-identical, re-saved
+before (`backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html`, byte-identical, re-saved
 under the same name per the ruling). Re-measured through
 `extract_page`/`listing_enumerates` rather than a raw-HTML grep: still
 **0.00 < 0.60**. The coordinator's supporting evidence (a claimed grep of
@@ -95,8 +95,8 @@ looked plausible, and is a useful general lesson (a section can be heavily
 populated in a sitemap with no index page of its own).
 
 Authorized fetch of `https://abb-bank.az/ferdi/kampaniyalar`: **HTTP 200**,
-593,870 bytes, saved as `fixtures/raw/listing-ferdi-kampaniyalar.html` and
-committed. `fixtures/raw/listing-kampaniyalar.html` (the two prior 404
+593,870 bytes, saved as `backend/scraper/tests/fixtures/raw/listing-ferdi-kampaniyalar.html` and
+committed. `listing-kampaniyalar.html` (the two prior 404
 bodies) deleted — a committed 404 is a trap for the next reader once
 superseded. Re-measured through `extract_page`/`content_blocks`: the page is
 real but a **client-rendered shell** — 5 content blocks total (`h1
@@ -128,7 +128,7 @@ does not silently grow or keep a competing index.
 
 Implementation: `backend/scraper/abb_scraper/synthetic.py`. Tests:
 `backend/scraper/tests/test_synthetic.py` — 2 unconditional tests plus 7 of
-the brief's 8 conditional tests (the product-section test is dropped along
+8 planned conditional tests (the product-section test is dropped along
 with the product branch it would have exercised).
 
 ## Consequences
