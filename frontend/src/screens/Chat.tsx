@@ -62,7 +62,7 @@ export function Chat({ corpusId }: { corpusId: string }) {
               </p>
             )}
             <p>{answer.answer}</p>
-            {/* No link here. §11.2's path back to abb-bank.az is the ledger's
+            {/* No link here. The path back to abb-bank.az is the ledger's
                 footer row — one link surface, right beside the provenance. */}
             <p style={{ fontSize: "0.8rem" }} className="meta">
               {answer.timings_ms.retrieval_ms}ms retrieval ·{" "}

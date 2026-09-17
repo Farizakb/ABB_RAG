@@ -60,7 +60,7 @@ nav { display: flex; flex-wrap: wrap; gap: var(--space-3); }
 
 /* Identity-and-navigation band, separated from the screen body by a rule
    in the same ledger-row language the rest of the design uses to divide
-   rows -- no card, no shadow, no sticky positioning (§11.4 forbids all
+   rows -- no card, no shadow, no sticky positioning (the design forbids all
    three). */
 header { border-bottom: 1px solid var(--rule); padding-bottom: var(--space-3); margin-bottom: var(--space-4); }
 header h1 { margin-bottom: var(--space-3); }
@@ -163,7 +163,7 @@ aside[aria-label="Sources"] td:nth-child(3) { width: 3.5rem; }
 @keyframes ledger-resolve { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 aside[aria-label="Sources"] { animation: ledger-resolve 280ms ease-out; }
 
-/* Chat's asymmetric two-column layout (§11.4): conversation at the 68ch
+/* Chat's asymmetric two-column layout: conversation at the 68ch
    measure, source ledger as a 22rem right rail. Declared here rather than
    inline in Chat.tsx so the narrow-width override below wins on the plain
    cascade instead of needing !important to beat an inline style. */
