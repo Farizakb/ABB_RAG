@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from abb_scraper.extract import content_blocks
 
-RAW = Path("fixtures/raw")
+RAW = Path("backend/scraper/tests/fixtures/raw")
 
 
 def load(name: str) -> str:

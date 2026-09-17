@@ -22,8 +22,9 @@ def _bank_node(data: object) -> dict[str, object] | None:
     """The `BankOrCreditUnion` node inside one parsed ld+json blob, wherever
     it sits.
 
-    Not always the top-level object: ABB's real homepage (`fixtures/raw/
-    homepage.html`) ships it nested inside a JSON-LD `@graph` array alongside
+    Not always the top-level object: ABB's real homepage
+    (`backend/scraper/tests/fixtures/raw/homepage.html`) ships it nested inside
+    a JSON-LD `@graph` array alongside
     `WebSite`/`WebPage`/`BreadcrumbList` sibling nodes, not as a bare object
     or a bare list of one. A version of this function that only checked
     `data[0] if isinstance(data, list) else data` never finds the real node

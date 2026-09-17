@@ -13,10 +13,10 @@ up:      ; docker compose up -d --build --wait
 down:    ; docker compose down
 logs:    ; docker compose logs -f
 ps:      ; docker compose ps
-ingest:  ; python scripts/ingest_fixture.py fixtures/corpus_sample.json
+ingest:  ; python scripts/ingest_fixture.py data/corpus_sample.json
 demo:
 	docker compose up -d --build --wait
-	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	@CID=$$(python scripts/ingest_fixture.py data/corpus_sample.json) && \
 	 python scripts/seed_demo.py $$CID && \
 	 echo "Open http://localhost:8080 - corpus $$CID is ready with seeded history."
 # `rag` is the only container holding OPENAI_API_KEY and the only one that can
@@ -30,14 +30,14 @@ demo:
 # ready (idempotent on corpus_id), so this costs $0 even on a fresh corpus
 # that `make demo`/`make ingest` already paid to embed once.
 eval-mock:
-	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	@CID=$$(python scripts/ingest_fixture.py data/corpus_sample.json) && \
 	 docker compose cp evals rag:/tmp/evals && \
 	 MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
 	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --mock --out /tmp/report.md
 # Real: calls the live OpenAI API for every golden question. Costs roughly
 # ten cents for the current 64-item set (see README).
 eval:
-	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	@CID=$$(python scripts/ingest_fixture.py data/corpus_sample.json) && \
 	 docker compose cp evals rag:/tmp/evals && \
 	 MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
 	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --out /tmp/report.md && \

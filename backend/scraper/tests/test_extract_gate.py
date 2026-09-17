@@ -15,7 +15,7 @@ from abb_scraper.extract import (
     strip_chrome,
 )
 
-RAW = Path("fixtures/raw")
+RAW = Path("backend/scraper/tests/fixtures/raw")
 
 
 def page(text: str, body: str | None = None) -> PageText:
@@ -196,7 +196,7 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
     body positionally with `page.text.split("\\n", 2)[-1]`, which is only
     correct when both a title and a meta description were prepended --
     extract_page's `if p` skips empty parts when joining `text`, so a
-    bodyless page (fixtures/raw/stub-empty.html: non-empty title/meta, zero
+    bodyless page (backend/scraper/tests/fixtures/raw/stub-empty.html: non-empty title/meta, zero
     content blocks) shifted the split and silently recovered the meta
     description as if it were the body. Root stubs must be recoverable this
     way, so hashing their description as a "body" would
@@ -205,7 +205,7 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
 
     The fix: `PageText.body` is now set explicitly by extract_page from the
     same joined body string, before `if p` filtering can drop it. This is a
-    standing check across all fixtures in fixtures/raw/ (stub-empty.html
+    standing check across all fixtures in backend/scraper/tests/fixtures/raw/ (stub-empty.html
     included) that `page.body` always equals the real joined block text --
     independently re-derived here straight from content_blocks + faq_blocks +
     dedupe_blocks (the same path extract_page itself takes to build `body`),

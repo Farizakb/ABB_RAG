@@ -166,7 +166,7 @@ cannot both be true.
 
 **Hypothesis.** The ADR's Status section said every number was re-run on corpus
 `90e08090` (280 documents). The artifact that actually ships is
-`fixtures/corpus_sample.json` — corpus
+`data/corpus_sample.json` — corpus
 `713ea0871c2f68f7662420bdd03d9d89fbc8e7b7fa610992a3100f1ddfbcf8ed`, 243 documents,
 560 chunks — a different, later corpus that `make demo` and the committed
 `evals/report.md` both use. The ADR was last measured before that corpus existed
@@ -214,7 +214,7 @@ this task did not touch.
 **Observed.** Hashing every corpus artifact on disk
 (`corpus_id = sha256(json.dumps(sorted(d.content_hash for d in documents)))`,
 `backend/shared/shared/contracts.py:61-62`) against `rag.corpora` found three
-files, not two. `fixtures/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
+files, not two. `data/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
 `data/corpus_20260913T163802Z.json` (also 243 docs, same id — a duplicate
 artifact) both matched a corpus ingested at `2026-09-15 15:35:10Z`.
 `data/corpus_20260915T151437Z.json` (280 docs, `90e08090d305…`) matched a
@@ -228,7 +228,7 @@ both of which had named the missing pointer documents by URL the whole time.
 **Hypothesis.** Entry 6 corrected ADR-0005's numbers to 30/43, "measured on the
 shipping corpus `713ea087…`" — every sentence in it was true when it was written.
 Its re-measurement was necessarily performed against whichever artifact
-`fixtures/corpus_sample.json` was at the time, which was `713ea087…`. What entry 6
+`data/corpus_sample.json` was at the time, which was `713ea087…`. What entry 6
 could not know is that `713ea087…` being the fixture was not settled fact: ruling
 P155 had proven the 30/43 figure was correctly measured against the artifact that
 then shipped, and consistent with the committed report — but ruling P164, that a
@@ -237,7 +237,7 @@ existed, had not yet been established. Proving P164 is what reverses entry 6's
 conclusion. Entry 6's own method was not wrong; the artifact it measured was about
 to be retired.
 
-**Change.** `fixtures/corpus_sample.json` replaced with
+**Change.** `data/corpus_sample.json` replaced with
 `data/corpus_20260915T151437Z.json` (280 documents, 736 chunks,
 `corpus_id = 90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`).
 `scripts/ablate_retrieval.py` re-run against `90e08090…`; `evals/report.md`

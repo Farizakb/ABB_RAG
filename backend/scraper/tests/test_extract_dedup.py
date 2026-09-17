@@ -21,7 +21,7 @@ def test_dedup_is_whitespace_and_case_insensitive() -> None:
 
 
 def test_real_page_duplication_is_around_39_percent() -> None:
-    html = Path("fixtures/raw/nagd-kredit.html").read_text("utf-8")
+    html = Path("backend/scraper/tests/fixtures/raw/nagd-kredit.html").read_text("utf-8")
     blocks, _ = content_blocks(html, "/ferdi/kreditler/nagd-kredit")
     kept, _ = dedupe_blocks(blocks)
     before = sum(len(b.text) for b in blocks)

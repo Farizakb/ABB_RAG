@@ -7,7 +7,7 @@ from abb_scraper.campaigns import classify, parse_range
 from abb_scraper.extract import content_blocks, extract_page
 
 TODAY = date(2026, 9, 14)
-RAW = Path("fixtures/raw")
+RAW = Path("backend/scraper/tests/fixtures/raw")
 
 
 def load(name: str) -> str:

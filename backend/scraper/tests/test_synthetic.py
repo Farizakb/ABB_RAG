@@ -36,7 +36,7 @@ def doc(
 
 
 def test_bank_facts_document_comes_from_ldjson_not_from_prose() -> None:
-    html = Path("fixtures/raw/homepage.html").read_text("utf-8")
+    html = Path("backend/scraper/tests/fixtures/raw/homepage.html").read_text("utf-8")
     d = bank_facts_document(html)
     assert d is not None and d.source_class == "corporate"
     assert "937" in d.text or "+994" in d.text
@@ -116,7 +116,7 @@ def test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves() -> 
     confirmed absent from the site (two direct 404s, and absent from the
     sitemap's 7,042 entries even though 247 of its own children are
     present). The real, HTTP-200 campaigns hub is `/ferdi/kampaniyalar`
-    (`fixtures/raw/listing-ferdi-kampaniyalar.html`) -- a client-rendered
+    (`backend/scraper/tests/fixtures/raw/listing-ferdi-kampaniyalar.html`) -- a client-rendered
     shell content-wise, but a page that actually resolves, which is what
     this test pins."""
     docs = [doc("https://abb-bank.az/kampaniyalar/a", "A", "campaign", vt=date(2026, 10, 31))]

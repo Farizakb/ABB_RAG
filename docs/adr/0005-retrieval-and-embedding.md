@@ -6,7 +6,7 @@ Settled. All five questions below were written down in `SPEC.md` §8.3 on day on
 with their decision rules, **before any number was visible** — that pre-commitment
 is the point of this ADR. The corpus that ships is
 `90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9` (280 documents,
-736 chunks) — the artifact in `fixtures/corpus_sample.json`, the one `make demo`
+736 chunks) — the artifact in `data/corpus_sample.json`, the one `make demo`
 ingests, and the one the committed `evals/report.md` was generated against.
 Items 1, 2 and 4 are pure retrieval questions with no generation step, so they were
 re-measured directly on this corpus via `scripts/ablate_retrieval.py`, which
