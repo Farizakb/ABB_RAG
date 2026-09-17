@@ -1,7 +1,18 @@
-.PHONY: scrape up down ingest demo eval test lint fresh db-ui
+.PHONY: setup scrape up down ingest demo eval eval-mock test lint reset-data db-ui logs ps
+# Creates .env from .env.example if missing, then checks OPENAI_API_KEY is set
+# to something other than the placeholder -- never prints the value either way.
+setup:
+	@if [ ! -f .env ]; then cp .env.example .env && echo "Created .env from .env.example -- edit it and set OPENAI_API_KEY."; fi
+	@key=$$(grep -E '^OPENAI_API_KEY=' .env | cut -d= -f2-); \
+	if [ -z "$$key" ] || [ "$$key" = "sk-replace-me" ]; then \
+		echo "OPENAI_API_KEY is not set in .env -- edit it and paste your key." >&2; exit 1; \
+	fi
+	@echo "setup OK."
 scrape:  ; docker compose --profile scraper run --rm scraper --max-pages 400
 up:      ; docker compose up -d --build
 down:    ; docker compose down
+logs:    ; docker compose logs -f
+ps:      ; docker compose ps
 # Walkthrough tool only: loopback-bound (127.0.0.1:5050), profile-gated so it
 # never starts with `up`/`demo`, and never part of the deployed stack.
 db-ui:   ; docker compose --profile tools up -d pgadmin
@@ -18,6 +29,17 @@ demo:
 # is copied into `rag` and the runner executes there; the host only needs
 # httpx to derive/ingest the corpus id first, the same dependency `make demo`
 # already has.
+# Free: FakeEmbedder for the query side, evals/runner.py's fixed-answer mock
+# client -- no OpenAI calls. Ingest is a no-op if the fixture is already
+# ready (idempotent on corpus_id), so this costs $0 even on a fresh corpus
+# that `make demo`/`make ingest` already paid to embed once.
+eval-mock:
+	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
+	 docker compose cp evals rag:/tmp/evals && \
+	 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \
+	   python evals/runner.py --golden evals/golden.jsonl --corpus-id $$CID --mock --out /tmp/report.md
+# Real: calls the live OpenAI API for every golden question. Costs roughly
+# ten cents for the current 64-item set (see README).
 eval:
 	@CID=$$(python scripts/ingest_fixture.py fixtures/corpus_sample.json) && \
 	 docker compose cp evals rag:/tmp/evals && \
@@ -38,4 +60,10 @@ test:
 # invocation (which type-checks pyproject.toml's [tool.mypy] `files` list as
 # a single run) hits mypy's duplicate-module-name error.
 lint:    ; ruff format --check . && ruff check . && mypy scripts packages services/rag && mypy services/chat
-fresh:   ; docker compose down -v && $(MAKE) up
+# DESTROYS the Postgres volume (every ingested corpus and interaction row)
+# before bringing the stack back up. No confirmation prompt. Renamed from
+# `fresh` so the name itself says what it does -- never run this against a
+# stack you want to keep.
+reset-data:
+	docker compose down -v
+	$(MAKE) up
