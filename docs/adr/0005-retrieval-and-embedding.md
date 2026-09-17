@@ -94,8 +94,7 @@ whose expected answer is a `product` document) falls from **33/39 (85%) to
 `/asan-kredit-veren-banklar`, is itself a stub) and `a43`
 (`abbnin atmleri harda var`), whose only labelled answer is `/atmler` — the ATM
 pointer document itself, which carries `source_class = 'stub'` on this corpus.
-Removing stubs would delete one of the two pointer documents
-ship. No row flips the other way; nothing is gained by excluding stubs here.
+Removing stubs would delete one of the two pointer documents that ship. No row flips the other way; nothing is gained by excluding stubs here.
 
 **The pre-committed rule's own logic now agrees with the shipped configuration.**
 Hit@5 drops when stubs are excluded, so the rule says stubs stay in — the same
@@ -106,7 +105,7 @@ special-case around, it is the reason stub exclusion is rejected.
 
 ### Item 3 — a pointer was needed, and says nothing a page does not
 
-The §5.5 bank-facts document did not produce a plausible grounded answer for
+The bank-facts document did not produce a plausible grounded answer for
 branch and ATM questions; retrieval reached the Android privacy policy instead,
 which mentions locations. The two pointer documents state only that the page exists
 and what it lists — never an address, an opening hour or a product fact, because

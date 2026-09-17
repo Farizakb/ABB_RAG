@@ -20,28 +20,28 @@ an enumeration question ("hansı kreditləriniz var") correctly: similarity
 search returns *k* items in no meaningful order, and the model would present
 that arbitrary subset as the complete answer.
 
-§5.5 also pre-commits a rule, in writing, before any index-generation code:
+The design also pre-commits a rule, in writing, before any index-generation code:
 **if ABB's own listing page already enumerates its children in retrievable
 text, no synthetic index is built for that class.** ABB runs that query
 server-side; using their page keeps ordering and maintenance on their side,
 and — the decisive reason — makes the synthetic answer incapable of
-disagreeing with `§11.2`'s footer link, which points at that same page.
+disagreeing with the answer's footer link, which points at that same page.
 
 This was measured directly rather than assumed.
-The project fetched exactly the two URLs §5.5 names — `https://abb-bank.az/kampaniyalar` and
+The project fetched exactly the two listing URLs — `https://abb-bank.az/kampaniyalar` and
 `https://abb-bank.az/ferdi/kreditler` — once each, through the existing
 `Fetcher` (robots.txt honoured, 1 req/s + jitter). Both responses are
 committed as `backend/scraper/tests/fixtures/raw/listing-kampaniyalar.html` and
 `backend/scraper/tests/fixtures/raw/listing-ferdi-kreditler.html`, so the measurement is
 reproducible offline and is never re-fetched. Full detail, including the
-structural check that ruled out a §5.3 chrome-stripper bug as an alternative
+structural check that ruled out a chrome-stripper bug as an alternative
 explanation is documented below.
 
 **Measured, not assumed:**
 
 | Class | Listing URL | Result | Extracted chars | Enumerates |
 |---|---|---|---|---|
-| product | `/ferdi/kreditler` | HTTP 200 | 2,083 (> 400-char §5.3 gate) | 6/6 real product-card titles survive extraction = **1.00 >= 0.60** |
+| product | `/ferdi/kreditler` | HTTP 200 | 2,083 (> 400-char content gate) | 6/6 real product-card titles survive extraction = **1.00 >= 0.60** |
 | campaign | `/kampaniyalar` | **HTTP 404** | n/a — page does not exist | 0 children, cannot clear the gate = **0.00 < 0.60** |
 
 The product page names every one of its six real body-content product cards
@@ -94,7 +94,7 @@ bodies) deleted — a committed 404 is a trap for the next reader once
 superseded. Re-measured through `extract_page`/`content_blocks`: the page is
 real but a **client-rendered shell** — 5 content blocks total (`h1
 "Kampaniyalar"`, `p "Ən son kampaniyalar"`, three generic ABB-mobile-app
-promo blocks), **320 extracted chars, under the §5.3 400-char gate**, and
+promo blocks), **320 extracted chars, under the 400-char content gate**, and
 zero `/kampaniyalar/<slug>` child links anywhere in its raw HTML. So
 `listing_enumerates == 0.00 < 0.60` — the campaign index is kept, and this
 time on two independent grounds (no enumeration, and the page would be
@@ -106,7 +106,7 @@ rejection of the bare and trailing-slash spellings (both confirmed 404) was corr
 
 ## Decision
 
-Per §5.5's table (one class at/above the 0.60 threshold, one class below —
+Per the rule above (one class at/above the 0.60 threshold, one class below —
 in fact unreachable): `index_documents` is written **for the campaign class
 only**. The product branch (a `section_path`-keyed index, one per
 `ferdi`/`biznes` sub-section) was never written at all — the losing option is
@@ -131,7 +131,7 @@ with the product branch it would have exercised).
   entries, even though 247 of its own children are present there), pinned
   verbatim by `test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves`.
   **This URL is confirmed HTTP 200 by direct fetch** — the citation-resolution risk is resolved. 
-  The page itself is a client-rendered shell content-wise (320 extracted chars, under the §5.3
+  The page itself is a client-rendered shell content-wise (320 extracted chars, under the content
   400-char gate) — a separate, already-handled concern (the gate exists
   precisely for pages like this), not a citation-resolution defect: a real
   visitor following the footer link lands on a real page, even though our

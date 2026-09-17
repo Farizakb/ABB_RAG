@@ -121,7 +121,7 @@ def pointer_documents(docs: list[Document]) -> list[Document]:
     address, no hours, no phone number is invented here. Both URLs returned
     HTTP 200 at scrape time (both are in `data/raw`), so invariant 12 holds.
 
-    `/filiallar` never survives the §5.3 gate (measured: one real body block,
+    `/filiallar` never survives the content gate (measured: one real body block,
     under MIN_CHARS), so its pointer is always a new Document. `/atmler` DOES
     survive -- it is kept as an ordinary "stub" page carrying a usage FAQ
     (deposit methods, limits, commissions) but no locations -- so a second
@@ -186,7 +186,7 @@ def listing_enumerates(listing_text: str, member_titles: list[str]) -> float:
     text.
 
     Extracted text, not HTML, because only extracted text is retrievable: a page
-    can render its children as links and still lose them to the §5.3 chrome
+    can render its children as links and still lose them to the chrome
     stripper. No members means nothing to enumerate, which is 0.0, not 1.0."""
     if not member_titles:
         return 0.0

@@ -27,7 +27,7 @@ class Embedder(Protocol):
 
 
 class OpenAIEmbedder:
-    """Behind an interface solely so the §8.3 item 5 bake-off is a config change."""
+    """Behind an interface solely so the embedder bake-off (ADR-0005) is a config change."""
 
     def __init__(self, model: str | None = None, dim: int | None = None) -> None:
         self.model = model or settings.embedding_model

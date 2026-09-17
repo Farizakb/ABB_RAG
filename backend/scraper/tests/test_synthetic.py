@@ -43,9 +43,8 @@ def test_bank_facts_document_comes_from_ldjson_not_from_prose() -> None:
 
 
 def test_listing_enumerates_measures_the_named_fraction_of_a_classes_members() -> None:
-    """The Step 1 measurement, pinned as a test so the number in RECON's
-    dated day-two heading and docs/adr/0006-*.md can be re-derived rather
-    than taken on trust."""
+    """The listing-enumeration measurement, pinned as a test so the number in
+    docs/adr/0006-*.md can be re-derived rather than taken on trust."""
     members = ["Kampaniya A", "Kampaniya B", "Kampaniya C"]
     full = "Kampaniyalar\nKampaniya A\nKampaniya B\nKampaniya C"
     shell = "Kampaniyalar"

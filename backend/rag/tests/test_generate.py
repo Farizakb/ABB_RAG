@@ -117,7 +117,7 @@ def test_the_prompt_forbids_claiming_a_list_is_latest_or_ordered(
     seeded_corpus: str, db: Any
 ) -> None:
     """Invariant 13. The corpus has no publication date, so recency is unknowable;
-    §5.5 explains why `valid_to` ascending is not a substitute for one."""
+    ADR-0006 explains why `valid_to` ascending is not a substitute for one."""
     client = FakeClient(json.dumps({"answer": "x", "citations": [1], "grounded": True}))
     answer(seeded_corpus, "ən son kampaniyalar", FakeEmbedder(dim=8), client)
     prompt = client.last_prompt.lower()

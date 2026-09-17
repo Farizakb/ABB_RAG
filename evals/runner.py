@@ -134,7 +134,7 @@ WHERE r.content_hash = %s
 
 
 def enumeration_context(corpus_id: str, item: dict[str, Any]) -> tuple[list[str], bool]:
-    """Read which §5.5 branch the build actually took, and the class's real members.
+    """Read which synthetic-index branch the build actually took, and the class's real members.
 
     `index_exists` is per class, not global: a synthetic campaign index can exist
     while ABB's own `/ferdi/kreditler` page won for products. An index document is

@@ -144,7 +144,7 @@ def test_page_without_a_breadcrumb_falls_back_to_h1() -> None:
             ["Biznes", "İslam bankçılığı"],
         ),
         ("biznes-sub-korporativ", "/biznes/korporativ/odenis-kartlari-1", ["Biznes", "Kartlar"]),
-        # Feature-list page shape: genuinely has no breadcrumb (RECON §2 finding).
+        # Feature-list page shape: genuinely has no breadcrumb.
         ("biznes-sub-mikro", "/biznes/mikro-biznes/gundelik-bankciliq", []),
     ],
 )
