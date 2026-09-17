@@ -155,14 +155,14 @@ sequenceDiagram
     participant O as OpenAI
 
     U->>C: POST /api/v1/questions -- corpus_id, question, session_id
-    Note over C: rate limit per client; PII redaction before anything is persisted
+    Note over C: rate limit per client, PII redaction before anything is persisted
     C->>R: POST /answer -- corpus_id, question
     R->>O: embed the question
     R->>D: dense pgvector cosine, plus FTS, plus pg_trgm -- RANK_DEPTH=100
     Note over R: Reciprocal Rank Fusion, RRF_K=60, then keep only docs with a dense-leg score, top 5 into the prompt
     R->>D: join rag.product_facts for those documents
     R->>O: generate -- strict JSON schema
-    Note over R: citations must resolve to supplied sources; zero resolving citations is a refusal
+    Note over R: citations must resolve to supplied sources, zero resolving citations is a refusal
     R-->>C: answer, citations, grounded, refused, refusal_class, usage, timings_ms
     C->>D: INSERT app.interactions -- exactly one row, including refusals and errors
     C-->>U: answer, sources, grounded, refused, timestamp, timings_ms
