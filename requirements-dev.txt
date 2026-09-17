@@ -8,23 +8,23 @@ ruff==0.14.14
 mypy==2.3.1
 pre-commit==4.6.2
 
-# packages/contracts models (rag/chat shared schema).
+# backend/shared models (rag/chat shared schema).
 pydantic==2.13.5
 
-# services/rag/conftest.py builds and migrates a `*_test` database directly
+# backend/rag/conftest.py builds and migrates a `*_test` database directly
 # from the host to run ingest tests -- needs psycopg on the host even though
-# it's already pinned in services/rag/requirements.txt for the container.
+# it's already pinned in backend/rag/requirements.txt for the container.
 # Pins match that file exactly.
 psycopg[binary]==3.3.5
 psycopg-pool==3.3.1
 
-# packages/scraper sitemap filter.
+# backend/scraper sitemap filter.
 # httpx is already pinned above; reused here for fetch_sitemap's client param.
 # selectolax: fast (Lexbor-backed) HTML/XML parser used to parse sitemap.xml's <url>/
 # <loc>/<lastmod> nodes in fetch_sitemap.
 selectolax==0.4.11
 
-# packages/scraper polite fetcher.
+# backend/scraper polite fetcher.
 # protego: stdlib urllib.robotparser is first-match-wins (1994 draft), which on ABB's
 # actual robots.txt allows /cgi-bin/ despite its Disallow; protego implements RFC 9309
 # most-specific-match.

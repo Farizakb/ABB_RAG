@@ -213,7 +213,7 @@ this task did not touch.
 
 **Observed.** Hashing every corpus artifact on disk
 (`corpus_id = sha256(json.dumps(sorted(d.content_hash for d in documents)))`,
-`packages/contracts/contracts/models.py:61-62`) against `rag.corpora` found three
+`backend/shared/contracts/models.py:61-62`) against `rag.corpora` found three
 files, not two. `fixtures/corpus_sample.json` (243 docs, `713ea0871c2f…`) and
 `data/corpus_20260913T163802Z.json` (also 243 docs, same id — a duplicate
 artifact) both matched a corpus ingested at `2026-09-15 15:35:10Z`.

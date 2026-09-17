@@ -126,8 +126,8 @@ every ingest via `_abb_already_enumerates` (not a one-off gate), so a corpus
 scraped after ABB ships a working product-enumeration or campaign-listing page
 does not silently grow or keep a competing index.
 
-Implementation: `packages/scraper/abb_scraper/synthetic.py`. Tests:
-`packages/scraper/tests/test_synthetic.py` — 2 unconditional tests plus 7 of
+Implementation: `backend/scraper/abb_scraper/synthetic.py`. Tests:
+`backend/scraper/tests/test_synthetic.py` — 2 unconditional tests plus 7 of
 the brief's 8 conditional tests (the product-section test is dropped along
 with the product branch it would have exercised).
 

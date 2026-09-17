@@ -3,7 +3,7 @@
 
 Generation-free by design -- these are pure retrieval questions, so embedding
 43 short queries costs a fraction of a cent and needs no LLM call. Reuses the
-exact legs, fusion constant and helpers `services/rag/app/retrieval.py` ships
+exact legs, fusion constant and helpers `backend/rag/app/retrieval.py` ships
 with (`DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`, `_tsquery`, `_fold`,
 `RANK_DEPTH`) -- imported, never modified, so this script cannot silently
 diverge from what production actually runs. Item 2's stub-exclusion variants
@@ -130,7 +130,7 @@ def hit(
     isolation.
 
     Fused call sites pass `dense_scores` because production
-    (`services/rag/app/retrieval.py:203-213`) walks the fused order and keeps
+    (`backend/rag/app/retrieval.py:203-213`) walks the fused order and keeps
     only documents that carry a proven dense-leg score at or above
     `settings.retrieval_floor`, discarding the rest, before taking the top
     k_prompt. A document the lexical legs alone would rank top-5 but that

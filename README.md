@@ -40,7 +40,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Start the stack | `make up` | `docker compose up -d --build --wait` |
 | Scrape (extraction) | `make scrape` | `docker compose --profile scraper run --rm scraper --max-pages 400` |
 | Load the corpus | `make demo` (or `make ingest`) | `python scripts/ingest_fixture.py fixtures/corpus_sample.json` |
-| Run tests | `make test` | `pytest packages`; `PYTHONPATH=packages/contracts pytest services/rag`; `PYTHONPATH=packages/contracts pytest services/chat`; `PYTHONPATH=services/rag:packages/contracts pytest evals`; `cd apps/web && npm test -- --run` |
+| Run tests | `make test` | `pytest backend/shared backend/scraper`; `PYTHONPATH=backend/shared pytest backend/rag`; `PYTHONPATH=backend/shared pytest backend/chat`; `PYTHONPATH=backend/rag:backend/shared pytest evals`; `cd frontend && npm test -- --run` |
 | Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
 | DB inspector | — | `docker compose exec db psql -U abb abb` |
@@ -67,12 +67,12 @@ seeded history — no empty charts.
 **Changed `WEB_PORT`?** The corpus loader targets `http://localhost:8080` by default; set
 `RAG_BASE_URL=http://localhost:<WEB_PORT>` before loading the corpus or running evals.
 
-`services/rag/app` and `services/chat/app` are both a top-level package named `app`, which is why
+`backend/rag/app` and `backend/chat/app` are both a top-level package named `app`, which is why
 `test`/`lint` run per project rather than once for the whole repo — a single bare `pytest`/`mypy`
 invocation hits a duplicate-module-name error across the two.
 
-**264 tests, all green:** `packages` 120, `services/rag` 82, `services/chat` 31, `evals` 23,
-`apps/web` (Vitest) 4. `ruff format`/`ruff check` and both `mypy` calls clean. `make eval` calls
+**264 tests, all green:** `backend/shared`+`backend/scraper` 120, `backend/rag` 82, `backend/chat` 31, `evals` 23,
+`frontend` (Vitest) 4. `ruff format`/`ruff check` and both `mypy` calls clean. `make eval` calls
 the live OpenAI API and costs real money — do not re-run it casually; `evals/report.md` and
 `evals/rows.json` are already committed from the last real run.
 
@@ -86,16 +86,16 @@ verified.
 
 | Brief requirement | Where | How verified |
 |---|---|---|
-| Parse the official ABB website and extract all textual content | `packages/scraper` (CLI producing `corpus_<ts>.json`) | Run against the live site; verified live |
+| Parse the official ABB website and extract all textual content | `backend/scraper` (CLI producing `corpus_<ts>.json`) | Run against the live site; verified live |
 | Let users upload the extracted data and store it in the browser's local storage | Data screen file picker; `localStorage` keys `abb.corpus` / `abb.corpus.manifest` | JSON-schema validated in the browser; verified live ([ADR-0001](docs/adr/0001-localstorage-and-the-vector-index.md)) |
-| Backend service interacting with an OpenAI LLM | `services/rag` | `OPENAI_API_KEY` is read only in `services/rag/*`, confirmed by grep |
+| Backend service interacting with an OpenAI LLM | `backend/rag` | `OPENAI_API_KEY` is read only in `backend/rag/*`, confirmed by grep |
 | Format extracted data into a vector DB compatible with OpenAI | `db/migrations/001_schema.sql`, `002_hybrid_lexical.sql`; Postgres 16 + pgvector | `text-embedding-3-small`, cosine similarity ([ADR-0002](docs/adr/0002-pgvector-over-a-dedicated-vector-database.md)) |
 | Chat interface once processing succeeds | Chat tab | Gated on ingest status reaching `ready`; verified live |
 | Answers stay within the context of the provided ABB information | [Grounding contract](#grounding-contract-cited-or-refused) | `evals/report.md`; verified live with a grounded answer and a refusal, both citing sources |
 | Microservice architecture for question handling and response generation, JSON | `chat` and `rag`, JSON over HTTP | Running containers; JSON responses observed in the UI ([ADR-0003](docs/adr/0003-two-services.md)) |
 | Store questions, answers and timestamps in a database | `app.interactions` | Verified live via a read-only `psql` count query |
 | Chart library visualising stored questions and answers | Analytics screen, Recharts | Shipped as two Recharts charts (`Questions over time`, `Answered versus refused`) plus two plain-HTML tables ([Analytics](#analytics)); verified live |
-| Package the app and its dependencies into Docker images | Four Dockerfiles (`apps/web`, `packages/scraper`, `services/chat`, `services/rag`) | `docker compose up` running healthy |
+| Package the app and its dependencies into Docker images | Four Dockerfiles (`frontend`, `backend/scraper`, `backend/chat`, `backend/rag`) | `docker compose up` running healthy |
 | Well-documented implementation choices | This README, six ADRs (`docs/adr/0001`–`0006`), `docs/error-analysis.md` | — |
 | Share all code within a given time interval | Self-contained repo, `fixtures/corpus_sample.json` committed, `make demo` | Runnable end to end from a fresh clone |
 | Be prepared for a code walkthrough and demo | `docs/demo-script.md`, `scripts/seed_demo.py` | Rehearsed as a read-through against source material; not yet timed as a live end-to-end run (see that document's own note) |
@@ -116,7 +116,7 @@ that ships, not against planning prose.
 ```mermaid
 flowchart TB
     subgraph offline["Offline, run once -- not part of the running app"]
-        scraper["packages/scraper -- Typer CLI, httpx + selectolax"]
+        scraper["backend/scraper -- Typer CLI, httpx + selectolax"]
         site[("abb-bank.az sitemap, 7042 URLs")]
         artifact["corpus_TIMESTAMP.json, 280 documents"]
         site -->|"556 URLs fetched, about 9.3 min"| scraper
@@ -126,9 +126,9 @@ flowchart TB
     artifact -.->|"reviewer picks the file"| web
 
     subgraph stack["docker compose -- four containers"]
-        web["apps/web -- React 18, Vite, Recharts, nginx on 8080"]
-        chat["services/chat -- FastAPI, question handling, schema app.*"]
-        rag["services/rag -- FastAPI, ingest + response generation, schema rag.*, sole holder of OPENAI_API_KEY"]
+        web["frontend -- React 18, Vite, Recharts, nginx on 8080"]
+        chat["backend/chat -- FastAPI, question handling, schema app.*"]
+        rag["backend/rag -- FastAPI, ingest + response generation, schema rag.*, sole holder of OPENAI_API_KEY"]
         db[("Postgres 16 + pgvector -- schema app.* and schema rag.*, HNSW vector_cosine_ops")]
     end
 
@@ -220,7 +220,7 @@ and returned as a fourth, narrowly-scoped legal state (`grounded=false, refused=
 citations=[]`), not a hole in the cited-or-refused invariant. A leak check
 (`_leaks_bank_content`) re-routes any small-talk reply containing a digit, a `%`, a currency mark,
 a URL, or a price/condition word through the same refusal path — a second line of defence, not the
-first; the residual risk is documented directly in `services/rag/app/generate.py`'s own docstring.
+first; the residual risk is documented directly in `backend/rag/app/generate.py`'s own docstring.
 
 ### Hybrid retrieval
 
@@ -250,7 +250,7 @@ confirming the redaction fires rather than merely existing in code.
 
 ### Analytics
 
-`apps/web/src/screens/Analytics.tsx`: **"Questions over time"** (line chart) and **"Answered
+`frontend/src/screens/Analytics.tsx`: **"Questions over time"** (line chart) and **"Answered
 versus refused"** (stacked bar, split by refusal class) are real Recharts charts. **"Most-cited
 ABB pages"** and a searchable, timestamped Q&A table are plain HTML tables, not charts. Four stat
 tiles (total questions, median latency, grounded rate, total cost) sit above them, plus a line
@@ -264,14 +264,14 @@ would otherwise silently distort the grounded-rate tile.
 `chat` applies a 30-per-minute limit on `POST /api/v1/questions`, keyed **per IP only**. The
 contract has a `session_id` field, but it's client-supplied (`crypto.randomUUID()` minted per
 tab), so a limit keyed on it would be trivially defeated by minting a new session id per request.
-The IP is taken from `X-Forwarded-For`, which `apps/web/nginx.conf` **overwrites** (not appends)
+The IP is taken from `X-Forwarded-For`, which `frontend/nginx.conf` **overwrites** (not appends)
 to `$remote_addr` — safe only because there is no CDN or load balancer in front of this nginx and
 `chat` publishes no port a client could reach on a second path. Behind a real CDN this overwrite
 would be wrong and the inbound chain would need to be trusted instead.
 
 ### Production hardening
 
-- **nginx security headers and CSP** (`apps/web/nginx.conf`): `X-Content-Type-Options: nosniff`,
+- **nginx security headers and CSP** (`frontend/nginx.conf`): `X-Content-Type-Options: nosniff`,
   `Referrer-Policy: no-referrer`, `X-Frame-Options: DENY`, and a `Content-Security-Policy`
   restricting scripts/styles/connections to `'self'`.
 - **Per-IP rate limiting**, as above.
@@ -324,7 +324,7 @@ and it would need eval coverage this build doesn't have yet.
 ## Known limitations & what production would add
 
 - **Lexical guards for semantic decisions.** `ADVISORY_HINTS` and the small-talk leak lexicon
-  (`services/rag/app/generate.py`) are string matching over meaning, so they can never be
+  (`backend/rag/app/generate.py`) are string matching over meaning, so they can never be
   complete. Production routes intent **before** retrieval with a classifier, so a small-talk path
   that never sees sources can't leak a fact by construction. The current design accepts this
   because the failure mode for known cases is a refusal, not a leak — the lexicon is a second line
@@ -343,11 +343,11 @@ and it would need eval coverage this build doesn't have yet.
   exposure.
 - **Ingest timing wasn't verified cold.** The database already held the shipping corpus before
   these checks ran, so every timed run hit the idempotent status-check fast path
-  (`services/rag/app/ingest.py`), not the embedding-and-indexing work the "under 3 minutes" budget
+  (`backend/rag/app/ingest.py`), not the embedding-and-indexing work the "under 3 minutes" budget
   is meant to bound. Production would run this on a schedule against a corpus the target database
   has never seen, and alert on regression.
 - **Corpus identity is coarse.** `corpus_id` hashes the whole document set
-  (`packages/contracts/contracts/models.py`), so re-uploading an identical corpus is a true no-op,
+  (`backend/shared/contracts/models.py`), so re-uploading an identical corpus is a true no-op,
   but changing one document produces an entirely new `corpus_id` and re-embeds every document in
   it — there's no embedding reuse keyed on individual chunk text. Production would cache
   embeddings by chunk-text hash across corpus versions and garbage-collect superseded corpora.

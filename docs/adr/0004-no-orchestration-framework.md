@@ -16,7 +16,7 @@ the set of decisions made by measurement: whether a lexical retrieval channel ea
 (hit@5, fused vs. dense-only), whether stub pages help or hurt, where the retrieval floor sits,
 which embedding model wins, how citation resolution and the refusal contract are enforced. Every
 one of those decisions lives in code a reviewer can open and read in a few lines:
-`services/rag/app/retrieval.py`'s Reciprocal Rank Fusion, `generate.py`'s citation-resolution and
+`backend/rag/app/retrieval.py`'s Reciprocal Rank Fusion, `generate.py`'s citation-resolution and
 refusal logic, `ingest.py`'s idempotency check. A framework's retriever/chain abstractions exist
 precisely to hide exactly this kind of plumbing behind a configurable interface — which is a
 reasonable thing to want in a system whose plumbing is not the point, and the wrong thing to want
@@ -34,7 +34,7 @@ without touching business logic. None of those apply here.
 
 ## Decision
 
-**Call the `openai` SDK directly.** `services/rag/app/embedder.py` wraps embedding calls behind a
+**Call the `openai` SDK directly.** `backend/rag/app/embedder.py` wraps embedding calls behind a
 one-function `Embedder` Protocol (so the day-three embedder bake-off — see
 [ADR-0005](0005-retrieval-and-embedding.md) — is a config change, not a refactor, and so tests can
 substitute a fake without a real API call); `generate.py` wraps the completion call behind an

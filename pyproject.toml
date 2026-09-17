@@ -11,11 +11,11 @@ strict = true
 # Only paths that exist today. evals/ has no directory yet -- add it back into
 # this list once it exists so it stays covered under --strict (mypy errors on
 # a nonexistent path in `files`, so it can't be listed pre-emptively).
-files = ["scripts", "packages", "services"]
+files = ["scripts", "backend"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
-# One bare `pytest` run can't work: services/rag/app and services/chat/app are
+# One bare `pytest` run can't work: backend/rag/app and backend/chat/app are
 # both top-level package `app`. make test / CI run pytest per project instead
 # (see Makefile / .github/workflows/ci.yml), so no shared testpaths/rootdir
 # assumption is made here.

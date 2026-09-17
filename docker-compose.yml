@@ -9,15 +9,15 @@ services:
       EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
     volumes: ["pgdata:/var/lib/postgresql/data", "./db/migrations:/migrations:ro", "./db/init:/docker-entrypoint-initdb.d:ro"]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-abb}"], interval: 5s, retries: 10 }
-    # Loopback-only, deliberately: lets host-side `pytest services/rag` reach
+    # Loopback-only, deliberately: lets host-side `pytest backend/rag` reach
     # Postgres to build its own `_test` database. `rag` (which holds the
     # OpenAI key) gets no such port.
     ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
   rag:
-    build: { context: ., dockerfile: services/rag/Dockerfile }
+    build: { context: ., dockerfile: backend/rag/Dockerfile }
     restart: unless-stopped
-    # The only service that reads OPENAI_API_KEY (services/rag/app/config.py,
-    # services/rag/app/embedder.py, generate.py) -- so it is the only one that
+    # The only service that reads OPENAI_API_KEY (backend/rag/app/config.py,
+    # backend/rag/app/embedder.py, generate.py) -- so it is the only one that
     # gets it, and `:?` fails the whole `up` fast, before any container starts,
     # if a reviewer forgot to paste it into .env.
     environment:
@@ -29,10 +29,10 @@ services:
     depends_on: { db: { condition: service_healthy } }
     healthcheck: { test: ["CMD", "python", "-c", "import httpx;httpx.get('http://localhost:8000/healthz').raise_for_status()"], interval: 10s, retries: 5 }
   chat:
-    build: { context: ., dockerfile: services/chat/Dockerfile }
+    build: { context: ., dockerfile: backend/chat/Dockerfile }
     restart: unless-stopped
-    # No OPENAI_API_KEY here -- services/chat/app/config.py has no such field
-    # and grep confirms nothing under services/chat reads it (README's
+    # No OPENAI_API_KEY here -- backend/chat/app/config.py has no such field
+    # and grep confirms nothing under backend/chat reads it (README's
     # key-isolation note). It only ever needs the DB and rag's internal URL.
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-abb}:${POSTGRES_PASSWORD:-abb}@db:5432/${POSTGRES_DB:-abb}
@@ -41,7 +41,7 @@ services:
     depends_on: { db: { condition: service_healthy }, rag: { condition: service_started } }
     healthcheck: { test: ["CMD", "python", "-c", "import httpx;httpx.get('http://localhost:8000/healthz').raise_for_status()"], interval: 10s, retries: 5 }
   web:
-    build: { context: ./apps/web }
+    build: { context: ./frontend }
     restart: unless-stopped
     ports: ["${WEB_PORT:-8080}:80"]
     depends_on: [chat, rag]
@@ -53,6 +53,6 @@ services:
     healthcheck: { test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"], interval: 10s, retries: 5 }
   scraper:
     profiles: ["scraper"]
-    build: { context: ., dockerfile: packages/scraper/Dockerfile }
+    build: { context: ., dockerfile: backend/scraper/Dockerfile }
     volumes: ["./data:/app/data", "./fixtures:/app/fixtures"]
 volumes: { pgdata: }
