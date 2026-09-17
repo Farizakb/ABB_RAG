@@ -1,4 +1,4 @@
-# Pinned for scripts/verify_gate.py.
+# Host-side HTTP client (scripts/ingest_fixture.py) and OpenAI SDK (rag tests).
 httpx==0.28.1
 openai==3.13.0
 

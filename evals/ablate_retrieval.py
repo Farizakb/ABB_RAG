@@ -1,4 +1,4 @@
-# scripts/ablate_retrieval.py
+# evals/ablate_retrieval.py
 """Retrieval-only ablations for ADR-0005 items 1, 2 and 4.
 
 Generation-free by design -- these are pure retrieval questions, so embedding
@@ -14,7 +14,7 @@ losing option is written down, and only long enough to be measured.
 The host cannot reach Postgres, so this runs inside the `rag`
 container, the same way the `eval` target in Makefile already does:
 
-    docker compose cp scripts/ablate_retrieval.py rag:/tmp/ablate_retrieval.py
+    docker compose cp evals/ablate_retrieval.py rag:/tmp/ablate_retrieval.py
     docker compose cp evals/golden.jsonl rag:/tmp/golden.jsonl
     docker compose exec -T -e PYTHONPATH=/app -w /tmp rag \\
       python ablate_retrieval.py --corpus <content_hash> --golden golden.jsonl

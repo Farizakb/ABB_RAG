@@ -9,7 +9,7 @@ is the point of this ADR. The corpus that ships is
 736 chunks) — the artifact in `data/corpus_sample.json`, the one `make demo`
 ingests, and the one the committed `evals/report.md` was generated against.
 Items 1, 2 and 4 are pure retrieval questions with no generation step, so they were
-re-measured directly on this corpus via `scripts/ablate_retrieval.py`, which
+re-measured directly on this corpus via `evals/ablate_retrieval.py`, which
 imports `retrieval.py`'s own `DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`,
 `_tsquery`, `_fold` and `RANK_DEPTH` rather than re-implementing them, so the
 comparison cannot silently diverge from what ships. Item 3 and Item 5
@@ -46,7 +46,7 @@ with Item 1's.
 ### Item 1 — the lexical channel earns its place
 
 Re-measured on the shipping corpus (`90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`,
-280 documents / 736 chunks) with `scripts/ablate_retrieval.py`, which imports
+280 documents / 736 chunks) with `evals/ablate_retrieval.py`, which imports
 `retrieval.py`'s `DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`, `_tsquery`, `_fold`
 and `RANK_DEPTH` and runs each leg's own query, fused and unfused, over the 43 rows
 of `evals/golden.jsonl` that carry `expected_source_urls`. `hit()` was corrected in
@@ -120,7 +120,7 @@ neither — see `docs/error-analysis.md` entry 7.
 ### Item 4 — no floor can separate the classes, so there is no floor
 
 Re-measured on the shipping corpus `90e08090…` with the same
-`scripts/ablate_retrieval.py`. The rule was to set `retrieval_floor` below the
+`evals/ablate_retrieval.py`. The rule was to set `retrieval_floor` below the
 lowest answerable best-score. That is now **0.311** (`a41`,
 `kartima pul nece yatira bilerem?`), but the highest out-of-scope best-score, over
 the 9 out-of-scope rows, is **0.609** (`r06`,
