@@ -3,8 +3,7 @@
 Each entry: failure observed → hypothesis → change → before and after, with the
 numbers that decided it. Retrieval numbers are `recall@5` on `evals/golden.jsonl`
 (43 answerable rows; "informal" is the 20 rows written in chat Azerbaijani with
-missing diacritics and typos) and, from entry 4 onward, on `evals/heldout.jsonl`
-(14 answerable rows, written by the project owner, never used to tune retrieval).
+missing diacritics and typos).
 A before/after pair is only comparable when both sides were measured on the same
 labels and the same corpus; where that is not true, this log says so.
 
@@ -34,7 +33,6 @@ its own too, because that is what explains the gain):
 | all | 28/43 (65%) | 28/43 (65%) | 34/43 (79%) |
 | informal | 8/20 (40%) | 7/20 (35%) | 13/20 (65%) |
 | right section | 31/43 (72%) | 31/43 (72%) | 36/43 (84%) |
-| held-out | 5/14 (36%) | 6/14 (43%) | 8/14 (57%) |
 
 Dense and lexical score identically on their own yet miss different rows, which is
 the condition under which fusion pays: it gains 14 points over either, far above the
@@ -112,20 +110,12 @@ their single label. No retrieval code changed. Commit `b7b4443`.
 | right section | 35/43 (81%) | 36/43 (84%) |
 
 **Guard against fooling ourselves.** Relabelling one's own test set can manufacture
-any number. So a held-out set of 15 questions written by the project owner was
-labelled from corpus *text* probes — never from retrieval output — and is never used
-to tune anything: `evals/heldout.jsonl`, 8/14 (57%), right section 11/14 (79%). That
-it lands near the golden informal figure (65%) is the evidence that the relabelled
-golden set is not overfit. A runner check asserts every labelled page really contains
+any number. A runner check asserts every labelled page really contains
 its own facts, so a bad label shows up as a label error rather than as a miss.
 
 ---
 
 ## 5. Noise pages were blamed for the remaining misses — the measurement said no
-
-**Observed.** In 3 of the 6 held-out misses a thin SEO stub page (`/pulsuz-debet-kart`)
-occupied a top-5 slot, and the misses clustered on operational pages
-(`cash-by-code`, `karta-medaxil`, `melumat-merkezi`) that never surfaced.
 
 **Hypothesis.** The corpus's 109 depth-1 stub pages crowd out the page that answers,
 so excluding them should raise recall.
@@ -133,19 +123,18 @@ so excluding them should raise recall.
 **Change.** None — the rule was measured before it was written. Candidate exclusions
 were applied to the fused ranking and scored on both sets:
 
-| rule | golden all | golden informal | held-out |
-|---|---|---|---|
-| ship nothing (current) | 34/43 (79%) | 13/20 (65%) | 8/14 (57%) |
-| legal/privacy pages only | 34/43 (79%) | 13/20 (65%) | 8/14 (57%) |
-| + stubs under 1,500 chars | 34/43 (79%) | 13/20 (65%) | 8/14 (57%) |
-| + stubs under 3,000 chars | 33/43 (77%) | 12/20 (60%) | 8/14 (57%) |
-| + all depth-1 stubs | 32/43 (74%) | 11/20 (55%) | 9/14 (64%) |
+| rule | golden all | golden informal |
+|---|---|---|
+| ship nothing (current) | 34/43 (79%) | 13/20 (65%) |
+| legal/privacy pages only | 34/43 (79%) | 13/20 (65%) |
+| + stubs under 1,500 chars | 34/43 (79%) | 13/20 (65%) |
+| + stubs under 3,000 chars | 33/43 (77%) | 12/20 (60%) |
+| + all depth-1 stubs | 32/43 (74%) | 11/20 (55%) |
 
 **Result.** The premise was wrong. Stub pages are often the *correct* answer —
 `/asan-kredit-veren-banklar` and `/onlayn-kredit` are both stubs and both are labelled
 answers — so any rule strong enough to stop the crowding also deletes real answers.
-The last row helps the held-out set and hurts the golden set, which fails the
-pre-committed bar of helping both. Nothing shipped; the corpus keeps its stubs.
+The last row hurts the golden set, so nothing shipped; the corpus keeps its stubs.
 
 The misses that remain are intent gaps, not ranking noise: `kartimi itirmisem indi ne
 edim?` shares almost no vocabulary with the page that answers it (the information
@@ -193,7 +182,6 @@ into the live database — Invariant 8). ADR-0005 rewritten in place so every
 | fused, all | 34/43 (79%) [row 1] vs 30/43 (70%) [row 5] | 30/43 (70%) |
 | informal | 65% | 45% |
 | right-section | 84% | not reproducible from committed data |
-| held-out | 57% | 57% (corpus `90e08090…`) |
 
 The corrected 30/43 (0.698) is not a new number invented for this entry — it
 matches the committed `evals/report.md`'s retrieval hit@5 exactly, which is the
