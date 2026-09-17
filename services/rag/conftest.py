@@ -4,7 +4,7 @@
 # same convention.
 """The `db` fixture used by every ingest test.
 
-Deliberately does NOT touch the dev database (P68): that database is migrated
+Deliberately does NOT touch the dev database: that database is migrated
 at EMBEDDING_DIM (1536, from .env) while these tests need vector(8), and
 TRUNCATE-ing it on every `make test` would destroy the ingested demo corpus.
 Instead this builds and owns a separate `*_test` database on the same
@@ -39,12 +39,12 @@ def _reachable(url: str) -> str:
     `settings.database_url` defaults to `postgresql://abb:abb@db:5432/abb`,
     where `db` is the compose SERVICE NAME. It resolves inside the compose
     network and nowhere else -- so on the host, which is where
-    `pytest services/rag` is actually run, the P68 fallback dialled a name
-    that does not exist and every test in this file skipped. CI never showed
+    `pytest services/rag` is actually run, dialling that name unchanged
+    would not exist and every test in this file would skip. CI never showed
     it, because CI sets `DATABASE_URL` to localhost itself: green everywhere
     it was watched, skipped everywhere it was used.
 
-    P70 published 5432 on the host for exactly this reason. Deciding on
+    Postgres publishes 5432 on the host for exactly this reason. Deciding on
     reachability rather than on an env var keeps ONE default correct in both
     places: inside the container `db` connects and is used unchanged.
 
@@ -89,7 +89,7 @@ def _reachable(url: str) -> str:
 def _test_database_url() -> str:
     """`$TEST_DATABASE_URL` if set, else `settings.database_url` with `_test`
     appended to the database name and an unreachable host rewritten to
-    `127.0.0.1` (P68, and see `_reachable`)."""
+    `127.0.0.1` (see `_reachable`)."""
     env_url = os.environ.get("TEST_DATABASE_URL")
     if env_url:
         return env_url
@@ -124,7 +124,7 @@ def _test_pool() -> Iterator[ConnectionPool]:
             if not exists:
                 conn.execute(f'CREATE DATABASE "{dbname}"')
     except psycopg.OperationalError as exc:
-        # P69: unreachable SKIPS locally (no Postgres on the dev machine is a
+        # Unreachable SKIPS locally (no Postgres on the dev machine is a
         # normal state) but FAILS when $CI is set (Postgres is guaranteed
         # there -- a silent skip in CI is exactly how vacuous coverage hides).
         reason = f"cannot reach test database at {test_url}: {exc}"
@@ -165,9 +165,9 @@ def db(_test_pool: ConnectionPool) -> Iterator[psycopg.Connection]:
 
 @pytest.fixture
 def seeded_corpus(db: psycopg.Connection) -> str:
-    """P80: the brief's test_retrieval.py takes this fixture for granted but
-    never defines it. Lives here, not in test_retrieval.py, because Task 20
-    (generation) will need the same seeded data.
+    """test_retrieval.py takes this fixture for granted but never defines it.
+    Lives here, not in test_retrieval.py, because generation tests need the
+    same seeded data.
 
     Depends on `db` (not `_test_pool`) so TRUNCATE runs before ingest, giving
     a clean, deterministic corpus regardless of test order.
@@ -176,9 +176,7 @@ def seeded_corpus(db: psycopg.Connection) -> str:
       chunk_document never splits it), and 12 documents -- comfortably above
       both k_candidates=20 (so `candidates` is never truncated: every chunk
       is a candidate) and k_prompt=5, so a test asserting `len(sources) <= 5`
-      is pinning a real cap, not an artifact of too little data. See the
-      task report for the measured cosine-score distribution these 12
-      documents produce under FakeEmbedder (ruling P82).
+      is pinning a real cap, not an artifact of too little data.
     - facts on three documents (nagd-kredit, avtokredit, biznes-kredit) so
       test_governed_facts_travel_with_their_source has something to find.
     - https://abb-bank.az/ferdi/kreditler is the parent listing of

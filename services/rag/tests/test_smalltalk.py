@@ -2,10 +2,8 @@
 # ruff: noqa: RUF001, RUF002 -- genuine Azerbaijani query/answer text (incl.
 # in docstrings quoting that text), same convention as services/rag/conftest.py
 # and services/rag/tests/test_refusal.py.
-"""Task 42: greetings and identity questions get a friendly reply, not the
-937 refusal boilerplate. See .superpowers/sdd/2026-09-12-abb-assistant/
-task-42-brief.md rulings 1-4, hardened by
-.superpowers/sdd/2026-09-12-abb-assistant/task-42-fix1.md F1/F2."""
+"""Greetings and identity questions get a friendly reply, not the
+937 refusal boilerplate."""
 
 from __future__ import annotations
 
@@ -35,7 +33,7 @@ def test_small_talk_passes_through_as_a_friendly_non_refusal(seeded_corpus: str,
             "intent": "small_talk",
         }
     )
-    # P94/test convention: "kredit" is the query already proven (test_generate.py,
+    # "kredit" is the query already proven (test_generate.py,
     # test_refusal.py) to clear FakeEmbedder's deterministic retrieval floor, so
     # this exercises the generation branch rather than the pre-LLM empty-retrieval
     # refusal -- the intent classification itself is on `out.intent` from the

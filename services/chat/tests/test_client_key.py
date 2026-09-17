@@ -1,5 +1,5 @@
 # services/chat/tests/test_client_key.py
-"""Finding 1 (Task 37): the rate limiter must key on the client's real
+"""The rate limiter must key on the client's real
 address as forwarded by nginx (X-Forwarded-For), not nginx's own address --
 otherwise every request sharing nginx's IP drains one shared bucket. nginx
 must overwrite that header (`$remote_addr`), never append to a

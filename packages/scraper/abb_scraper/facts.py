@@ -31,7 +31,7 @@ NUMBER = re.compile(r"(\d[\d\s.,]*)")
 
 
 def normalize_label(s: str) -> str:
-    """Controller ruling P38. `s.lower()` alone is broken for Azerbaijani:
+    """`s.lower()` alone is broken for Azerbaijani:
     `"İllik faiz dərəcəsi".lower()` does not produce `"illik faiz dərəcəsi"`
     -- Python lowercases U+0130 LATIN CAPITAL LETTER I WITH DOT ABOVE to a
     *two*-codepoint sequence, `i` + U+0307 COMBINING DOT ABOVE (`casefold()`
@@ -46,11 +46,11 @@ def normalize_label(s: str) -> str:
 
 def _label_key(label_raw: str) -> str:
     """Lookup key for `LABELS`. Real markup carries trailing sentence
-    punctuation that the brief's hand-built STAT list didn't include --
+    punctuation that a hand-built stat list wouldn't include --
     nagd-kredit.html's actual block is `"Zamin tələb olunmur."`, period and
-    all, not the bare `"Zamin tələb olunmur"` the brief tested against.
-    Stripped here, separately from `normalize_label`, which the controller
-    ruling fixes for exactly one defect (AZ casing) and nothing more.
+    all, not the bare `"Zamin tələb olunmur"`.
+    Stripped here, separately from `normalize_label`, which fixes exactly
+    one defect (AZ casing) and nothing more.
     """
     return normalize_label(label_raw).rstrip(".,;:!?")
 
@@ -76,11 +76,11 @@ def _parse_value(raw: str) -> tuple[float | None, str | None, str | None]:
 
 
 def extract_facts(blocks: list[Block], product: str, url: str) -> list[Fact]:
-    """Value-then-label stat blocks -> governed rows (SPEC §5.3, §7.3;
-    RECON §5 measured the order as value-then-label, not label-then-value).
+    """Value-then-label stat blocks -> governed rows (measured on the live
+    markup as value-then-label, not label-then-value).
     Rule-based only: a model that invents a number here produces a
     fabricated fact wearing a valid citation, which no downstream check can
-    catch (invariant 7).
+    catch.
     """
     out: list[Fact] = []
     for i in range(len(blocks) - 1):
@@ -111,7 +111,7 @@ def reassemble(facts: list[Fact], product: str) -> str:
     """One declarative sentence carrying the product name, so a question
     about the maximum amount retrieves a subject rather than a bag of
     numbers. Every `raw_fragment` appears verbatim in the sentence, so it
-    and the fact rows can never disagree on a figure (SPEC §7.3).
+    and the fact rows can never disagree on a figure.
     """
     if not facts:
         return ""

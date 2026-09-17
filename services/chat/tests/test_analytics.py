@@ -86,7 +86,7 @@ def test_empty_database_returns_zeros_rather_than_erroring(db: Any) -> None:
     assert body["totals"]["questions"] == 0 and body["volume_by_day"] == []
 
 
-# P104: refused_unsafe is its own field on every day, and refusal_rate counts
+# refused_unsafe is its own field on every day, and refusal_rate counts
 # all three refusal classes (out_of_scope, advisory, unsafe), not just two.
 def test_unsafe_refusals_are_counted_in_volume_and_refusal_rate(
     db: Any, seeded_interactions: None
@@ -98,14 +98,14 @@ def test_unsafe_refusals_are_counted_in_volume_and_refusal_rate(
     assert body["refusal_rate"] == round(3 / 5, 3)
 
 
-# P106: window must match ^\d{1,3}d$, otherwise the request is rejected
+# window must match ^\d{1,3}d$, otherwise the request is rejected
 # rather than silently falling back to a default window.
 def test_bad_window_returns_422(db: Any) -> None:
     r = client.get("/api/v1/analytics/summary?window=notaday")
     assert r.status_code == 422
 
 
-# P108: the write path must persist `retrieval` from `data["sources"]` (the
+# The write path must persist `retrieval` from `data["sources"]` (the
 # prompt sources the model actually saw: n/url/score/source_class), not
 # rag's internal dense-candidate list (`data.get("retrieval")`, shaped
 # {document_id, url, score} with no `n` -- see services/rag/app/retrieval.py
@@ -154,7 +154,7 @@ def test_write_path_persists_p108_retrieval_shape_and_top_sources_resolves(
         "usage": {"prompt_tokens": 100, "completion_tokens": 30},
         # rag's internal dense-candidate list -- deliberately a different
         # shape (no `n`) from `sources` above, to prove the write path
-        # ignores this field per P108.
+        # ignores this field.
         "retrieval": [
             {"document_id": "d1", "url": url_1, "score": 0.80},
             {"document_id": "d2", "url": url_2, "score": 0.93},
@@ -185,7 +185,7 @@ def test_write_path_persists_p108_retrieval_shape_and_top_sources_resolves(
     assert url_1 not in by_url
 
 
-# Task 42, ruling 6: a small-talk row (grounded=false, refused=false, error is
+# A small-talk row (grounded=false, refused=false, error is
 # null) must not dilute grounded_rate's denominator and must be reported as
 # its own count.
 def test_small_talk_is_excluded_from_grounded_rate_and_counted_on_its_own(db: Any) -> None:

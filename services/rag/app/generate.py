@@ -42,14 +42,14 @@ class ModelOutput(BaseModel):
     answer: str
     citations: list[int]
     grounded: bool
-    # Task 42: defaults to "bank_question" so a payload from before this field
-    # existed (every FakeClient fixture pinned in tests written pre-v2) still
-    # parses and takes the original cited-or-refused path unchanged.
+    # Defaults to "bank_question" so a payload from before this field existed
+    # (every FakeClient fixture pinned in tests written pre-v2) still parses
+    # and takes the original cited-or-refused path unchanged.
     intent: Literal["bank_question", "small_talk"] = "bank_question"
 
 
 class Completion(Protocol):
-    """P89: the LLM-client seam, mirroring `Embedder`'s Protocol pattern so
+    """The LLM-client seam, mirroring `Embedder`'s Protocol pattern so
     `FakeClient` (tests) is substitutable for `OpenAIClient` with no
     `# type: ignore` at the call sites in `answer()`."""
 
@@ -140,7 +140,7 @@ def _refuse(
     timings: dict[str, int],
     usage: dict[str, int],
 ) -> AnswerResponse:
-    """P88: every parameter typed -- the Makefile's mypy target runs --strict
+    """Every parameter typed -- the Makefile's mypy target runs --strict
     repo-wide, so an untyped `def` here is a `no-untyped-def` failure."""
     return AnswerResponse(
         answer=ADVISORY_AZ if refusal_class == "advisory" else REFUSAL_AZ,
@@ -157,11 +157,11 @@ def _refuse(
 
 
 def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion) -> AnswerResponse:
-    """P89: `client: Completion` (a Protocol), not `object` -- both
+    """`client: Completion` (a Protocol), not `object` -- both
     `client.complete(...)` calls below are then plain attribute access, no
     `# type: ignore[attr-defined]` needed.
 
-    Invariant (SPEC §7.4, revised by Task 42): every return is grounded with
+    Invariant: every return is grounded with
     >=1 resolved citation, `_refuse(...)`, or exactly one further legal
     state -- `out.intent == "small_talk"` (a greeting, an identity question,
     thanks, goodbye; never a bank fact): `grounded=false, refused=false,
@@ -181,11 +181,11 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
     timings = {"retrieval_ms": r.took_ms}
 
     if not r.sources:
-        # Floor caught it before an API call was made (SPEC §7.5). P94: which
-        # refusal copy the customer sees -- and whether they are routed to 937 --
-        # must not depend on whether retrieval happened to clear the floor, so
-        # this path picks the refusal class the same way the grounded path
-        # below does (SPEC §7.6), instead of always claiming out_of_scope.
+        # Floor caught it before an API call was made. Which refusal copy the
+        # customer sees -- and whether they are routed to 937 -- must not
+        # depend on whether retrieval happened to clear the floor, so this
+        # path picks the refusal class the same way the grounded path below
+        # does, instead of always claiming out_of_scope.
         early_klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
         return _refuse([], early_klass, r.candidates, {**timings, "generation_ms": 0}, {})
 

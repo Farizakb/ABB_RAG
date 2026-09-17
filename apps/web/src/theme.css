@@ -24,7 +24,7 @@ body {
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 
 /* ---------------------------------------------------------------------
-   SPEC §11.4 design layer (Task 34). Tailwind preflight resets browser
+   Design layer. Tailwind preflight resets browser
    defaults; everything below restores hierarchy, affordance and rhythm
    using only the tokens above. Plain CSS, no utility classes. */
 
@@ -45,13 +45,13 @@ p { margin: 0 0 var(--space-3); line-height: 1.5; }
 
 /* Page shell rhythm -- the only <nav>/<main> in the app, so plain
    elements are safe, stable selectors. */
-/* §11.4's "left-aligned throughout" governs text and column alignment
+/* "left-aligned throughout" governs text and column alignment
    inside the app (body copy, the conversation column) -- it says nothing
    about where the shell sits in the viewport. The cap below keeps
    Analytics' tables readable on a wide monitor without reintroducing the
    68ch page-wide measure that was squeezing the ledger rail and wrapping
    the stat tiles onto a second row; centring that capped shell in the
-   viewport (P159) preserves every property §11.4 names -- text still
+   viewport preserves every property named above -- text still
    left-aligned, the two-column asymmetry and right-aligned numerics
    untouched -- while removing the dead margin a plain max-width leaves on
    one side of a wide monitor. */

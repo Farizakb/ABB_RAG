@@ -89,7 +89,7 @@ def test_a_single_oversized_section_becomes_one_chunk_over_the_bound() -> None:
 
 
 def test_overlap_cap_bounds_the_carried_tail() -> None:
-    """Proves the CHUNK_OVERLAP cap (ruling 2) is load-bearing. Every line in
+    """Proves the CHUNK_OVERLAP cap is load-bearing. Every line in
     every other test in this file is well under CHUNK_OVERLAP (80) tokens --
     matching the real corpus, whose max line is 63 tokens -- so the capped and
     uncapped carry paths are behaviourally identical everywhere else in this
@@ -99,7 +99,7 @@ def test_overlap_cap_bounds_the_carried_tail() -> None:
     Section B is sized so A + B comfortably exceeds CHUNK_TOKENS + CHUNK_OVERLAP
     (~702 tokens, "söz " * 300), while B alone does not. Capped: A's tail (101
     > CHUNK_OVERLAP) is dropped, so the second chunk is B alone (~602 tokens,
-    within bound). Uncapped (the brief's original `current[-1:]`, which carries
+    within bound). Uncapped (a naive `current[-1:]`, which carries
     the whole previous section regardless of size): A's full tail carries
     forward and the second chunk becomes A + B (~702 tokens), breaking the
     bound this test asserts.
@@ -111,7 +111,7 @@ def test_overlap_cap_bounds_the_carried_tail() -> None:
 
 
 def test_azerbaijani_fragments_more_than_english() -> None:
-    """The measurement §7.1 defers to day two. Azerbaijani is agglutinative and
+    """Azerbaijani is agglutinative and
     English-centric BPE fragments it, which moves chunk count and cost together."""
     az = tokens_per_char(["Nağd kredit üzrə illik faiz dərəcəsi və müddət şərtləri"])
     en = tokens_per_char(["Cash loan annual interest rate and term conditions"])

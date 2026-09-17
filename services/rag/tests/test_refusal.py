@@ -61,7 +61,7 @@ def test_refusal_copy_never_apologises_and_never_speculates(seeded_corpus: str, 
     r = answer(seeded_corpus, "Hava necədir?", FakeEmbedder(dim=8), Client(False))
     lowered = r.answer.lower()
     assert "üzr istəyirəm" not in lowered and "bəlkə" not in lowered
-    # P96: a positive assertion -- the two substring-absence checks above also
+    # A positive assertion -- the two substring-absence checks above also
     # hold vacuously if r.answer were emptied, so pin that the refusal copy is
     # non-empty and actually routes the customer to the call centre.
     assert r.answer.strip()
@@ -85,11 +85,11 @@ def test_a_published_criterion_may_still_be_stated_with_a_citation(
 def test_advisory_question_with_no_retrieved_sources_still_refuses_as_advisory(
     seeded_corpus: str, db: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """P94: `answer()` used to early-return `out_of_scope` before ever consulting
+    """`answer()` used to early-return `out_of_scope` before ever consulting
     `_looks_advisory` when retrieval came back empty, so which refusal copy the
     customer saw -- and whether they were routed to 937 -- depended on whether a
     vector search happened to clear the floor. Force the empty-retrieval path the
-    same way Task 19's floor test does (monkeypatch the floor above the maximum
+    same way the floor test does (monkeypatch the floor above the maximum
     possible cosine score), not by inventing a second mechanism."""
     monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
     r = answer(

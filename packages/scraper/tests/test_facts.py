@@ -80,7 +80,7 @@ def test_sentence_and_rows_never_disagree_on_a_figure() -> None:
         assert f.raw_fragment in sentence
 
 
-# -- P38: Azerbaijani casing -------------------------------------------------
+# -- Azerbaijani casing -------------------------------------------------------
 
 
 def test_normalize_label_folds_the_capital_dotted_i_to_plain_i() -> None:
@@ -97,7 +97,7 @@ def test_normalize_label_folds_the_capital_dotted_i_to_plain_i() -> None:
 
 
 def test_normalize_label_leaves_other_azerbaijani_letters_intact() -> None:
-    """The other half of P38: a general NFKD fold would also pass the İ
+    """The other half of the previous test: a general NFKD fold would also pass the İ
     case above but would silently decompose `ə ü ğ ç ş ı` into
     base-letter-plus-combining-mark sequences, corrupting every other
     Azerbaijani label. Stripping only U+0307 must leave these untouched."""

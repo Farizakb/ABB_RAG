@@ -16,7 +16,7 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True)
 def _fake_embedder(monkeypatch: pytest.MonkeyPatch) -> None:
-    """P78: app.routes.get_embedder is the only seam -- patch it so this
+    """app.routes.get_embedder is the only seam -- patch it so this
     module never calls OpenAI and never trips ingest_corpus's dimension check
     against the vector(8) test schema (the production embedder is 1536-dim)."""
     monkeypatch.setattr("app.routes.get_embedder", lambda: FakeEmbedder(dim=8))
@@ -68,11 +68,11 @@ def test_malformed_corpus_is_422_not_500(db: Any) -> None:
 
 
 def test_stalled_status_is_persisted_as_failed_and_enables_retry(db: Any) -> None:
-    """P77: the GET stall detector must PERSIST status='failed', not only
+    """The GET stall detector must PERSIST status='failed', not only
     report it in the HTTP response. Verified two ways: (1) read the row back
     directly after the GET, independent of the response body; (2) call
     ingest_corpus on the same corpus afterwards and confirm it reaches
-    'ready' -- which only happens if it found a `failed` row and took P72's
+    'ready' -- which only happens if it found a `failed` row and took the
     retry branch (a fresh `processing` row would instead be left alone, per
     test_a_processing_corpus_is_not_re_ingested in test_ingest.py)."""
     embedder = FakeEmbedder(dim=8)
@@ -107,9 +107,9 @@ def test_stalled_status_is_persisted_as_failed_and_enables_retry(db: Any) -> Non
 def test_ingest_failure_is_recorded_only_on_the_matching_model_row(
     db: Any, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """P76: _run's failure UPDATE must filter on embedding_model as well as
+    """_run's failure UPDATE must filter on embedding_model as well as
     content_hash -- otherwise it would also clobber a different, healthy row
-    for the same corpus ingested under a second model (Invariant 8)."""
+    for the same corpus ingested under a second model."""
 
     class BrokenEmbedder:
         model = "broken-model"
@@ -141,9 +141,9 @@ def test_ingest_failure_is_recorded_only_on_the_matching_model_row(
 
 
 def test_get_status_reads_only_the_matching_model_row(db: Any) -> None:
-    """P76: the GET SELECT must filter on embedding_model as well as
+    """The GET SELECT must filter on embedding_model as well as
     content_hash -- otherwise, given two rows for the same corpus under
-    different models (Invariant 8), it could return the wrong one. Plant two
+    different models, it could return the wrong one. Plant two
     rows with the SAME content_hash and DIFFERENT embedding_model, in
     distinguishable states, and assert the response matches the row for the
     model app.routes.get_embedder() returns (FakeEmbedder(dim=8), model

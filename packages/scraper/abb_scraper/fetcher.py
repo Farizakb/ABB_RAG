@@ -26,7 +26,7 @@ class FetchResult(NamedTuple):
 class Fetcher:
     """One connection, one request per second with jitter, robots.txt obeyed.
 
-    Raw HTML is persisted so re-parsing never means re-crawling (SPEC §5.1).
+    Raw HTML is persisted so re-parsing never means re-crawling.
     """
 
     user_agent = "ABB-Assistant-CaseStudy/1.0 (+farizakb090@gmail.com)"

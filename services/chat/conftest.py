@@ -6,7 +6,7 @@
 
 `db` builds and migrates a dedicated `*_chat_test` database from the real
 migration file, the same approach services/rag/conftest.py uses for its own
-`*_test` database (P68) -- a different suffix so a concurrent `pytest
+`*_test` database -- a different suffix so a concurrent `pytest
 services/rag` run never truncates tables this suite depends on, and vice
 versa.
 
@@ -15,7 +15,7 @@ app.routes, so these tests never make a real network call to the sibling
 answer service.
 
 `seeded_interactions` inserts a fixed set of `app.interactions` rows for the
-analytics tests (task 25): answered/grounded rows whose citations resolve
+analytics tests: answered/grounded rows whose citations resolve
 against a retrieval entry, one refusal of each `refusal_class`, and a
 question containing "kredit" for the search test. Every value here is
 fabricated -- none of it is real PII, and card-shaped digits are avoided
@@ -46,7 +46,7 @@ TEST_DIM = 8
 
 def _reachable(url: str) -> str:
     """Rewrite an unreachable host to `127.0.0.1` -- see the long version of
-    this rationale in services/rag/conftest.py (P68/P70): `settings.database_url`
+    this rationale in services/rag/conftest.py: `settings.database_url`
     defaults to the compose service name `db`, which only resolves inside the
     compose network, and `localhost` pays a slow IPv6 fallback on Windows that
     `ConnectionPool`'s background workers don't survive.
@@ -109,7 +109,7 @@ def _test_pool() -> Iterator[ConnectionPool]:
             if not exists:
                 conn.execute(f'CREATE DATABASE "{dbname}"')
     except psycopg.OperationalError as exc:
-        # P69: unreachable SKIPS locally (no Postgres on the dev machine is a
+        # Unreachable SKIPS locally (no Postgres on the dev machine is a
         # normal state) but FAILS when $CI is set (Postgres is guaranteed
         # there -- a silent skip in CI is exactly how vacuous coverage hides).
         reason = f"cannot reach test database at {test_url}: {exc}"
@@ -154,13 +154,13 @@ VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
 
 @pytest.fixture
 def seeded_interactions(db: psycopg.Connection) -> None:
-    """Rows the analytics tests (task 25) need, all within the default 7-day
-    window (created_at defaults to now()): two answered/grounded rows whose
+    """Rows the analytics tests need, all within the default 7-day window
+    (created_at defaults to now()): two answered/grounded rows whose
     `citations` resolve against a `retrieval` entry sharing the same `n`, one
     refusal per `refusal_class`, and a question containing "kredit" for the
     search test.
 
-    P108: `retrieval` entries use the shape the write path actually persists
+    `retrieval` entries use the shape the write path actually persists
     (`n`, `url`, `score`, `source_class`, taken from `data["sources"]`), not
     rag's internal dense-candidate list -- see the `_retrieval_from_sources`
     docstring in app/routes.py.

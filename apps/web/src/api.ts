@@ -102,7 +102,7 @@ export type AnalyticsSummary = {
   volume_by_day: VolumeDay[];
   grounded_rate: number;
   refusal_rate: number;
-  // Task 42: a small-talk reply (grounded=false, refused=false) is neither
+  // A small-talk reply (grounded=false, refused=false) is neither
   // grounded nor refused -- its own count, kept out of grounded_rate and
   // refusal_rate so a friendly greeting never reads as a miss.
   small_talk_count: number;

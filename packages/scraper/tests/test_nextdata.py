@@ -195,7 +195,7 @@ def test_faq_item_fully_rendered_in_the_dom_is_not_appended_twice() -> None:
     would just delete the dedupe. Measured corpus-wide: 0/581 pairs are
     dropped by a full-question-AND-full-answer rule today (no ABB page
     currently server-renders a complete item), but the guard must still fire
-    the day one does.
+    the day a page does.
     """
     html = (FIXTURES / "nagd-kredit.html").read_text(encoding="utf-8")
     dom, _ = content_blocks(html, NAGD_KREDIT)

@@ -79,8 +79,8 @@ def _is_chrome(node: Node) -> bool:
     widget (id="rate-this-page" on every fixture that has one).
 
     The widget is excluded by container id rather than by truncating the
-    document at the first occurrence of its text (SPEC's original mental
-    model): on ABB's Next.js pages the widget's markup is emitted near the
+    document at the first occurrence of its text: on ABB's Next.js pages the
+    widget's markup is emitted near the
     TOP of the raw HTML, right after </header> and ahead of several React
     Suspense placeholders, even though it renders at the bottom of the page.
     A "content runs from breadcrumb to feedback marker" scan over raw source
@@ -142,15 +142,13 @@ def _find_breadcrumb(tree: HTMLParser) -> list[str]:
 def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
     """The content region, minus nav/header/footer chrome and the feedback
     widget, plus the breadcrumb trail (which may legitimately be empty --
-    see `_find_breadcrumb`). Amends SPEC.md §5.3 rule 1, which described a
-    "breadcrumb to feedback marker" position-based scan that does not work
-    on ABB's actual markup; see SPEC.md for the superseded original text and
-    RECON.md for the fixture-by-fixture evidence.
+    see `_find_breadcrumb`). Replaces a "breadcrumb to feedback marker"
+    position-based scan that does not work on ABB's actual markup.
 
-    `url_path` is part of the required interface for this task (consumed by
-    later tasks) but is currently unused: breadcrumb detection no longer
-    validates against it (see `_find_breadcrumb`), and chrome exclusion
-    never depended on it. Kept for interface stability.
+    `url_path` is part of this function's interface but is currently unused:
+    breadcrumb detection no longer validates against it (see
+    `_find_breadcrumb`), and chrome exclusion never depended on it. Kept for
+    interface stability.
     """
     tree = HTMLParser(html)
     for tag in ("script", "style", "noscript", "svg"):
@@ -164,7 +162,7 @@ def content_blocks(html: str, url_path: str) -> tuple[list[Block], list[str]]:
     # breadcrumb-anchored pages (ABB wraps the breadcrumb itself in
     # <nav aria-label="breadcrumb">, so it is dropped along with the rest of
     # chrome) and pages with no breadcrumb at all, such as the biznes/**
-    # segment-hub pages (V-1: 88 of 185 core pages live under biznes/**, and
+    # segment-hub pages (88 of 185 core pages live under biznes/**, and
     # roughly a third of the sampled ones have no breadcrumb and no <h1> --
     # a hub of promo tiles instead).
     blocks = [b for node, b in pairs if not _is_chrome(node)]
@@ -191,12 +189,11 @@ def faq_blocks(html: str, dom_blocks: list[Block], url_path: str) -> list[Block]
     already present in the DOM text -- not the answer alone, and not a
     prefix of it. A question-keyed skip discarded 76 pairs (25,903 chars)
     across 19 pages: many pages server-render the accordion's question
-    triggers but never their answers (task-14c-fix2-brief.md, measured
-    2026-09-14 on the 550-file raw cache). Re-keying on the answer's first 60
-    characters fixed that but broke 3 different pages the same way: a DOM
-    teaser that shares the answer's opening clause matched the prefix while
-    the full answer was never rendered at all, so the same class of silent
-    deletion recurred (task-14c-fix3-brief.md, same measurement date).
+    triggers but never their answers (measured on the 550-file raw cache).
+    Re-keying on the answer's first 60 characters fixed that but broke 3
+    different pages the same way: a DOM teaser that shares the answer's
+    opening clause matched the prefix while the full answer was never
+    rendered at all, so the same class of silent deletion recurred.
     Corpus-wide, requiring the full question AND the full answer drops zero
     pairs today -- no ABB page currently server-renders a complete accordion
     item -- and that is correct; the guard stays because a page that does
@@ -227,13 +224,13 @@ class PageText(NamedTuple):
 
 
 def dedupe_blocks(blocks: list[Block]) -> tuple[list[Block], int]:
-    """SPEC §5.3 rule 2. Hash each block, keep the first, count the rest.
+    """Hash each block, keep the first, count the rest.
 
     The key folds both case AND whitespace (`re.sub(r"\\s+", " ", ...)`), not
     case alone: real pages repeat the same block with differing inline
     whitespace after a template re-render (e.g. "Nağd  Kredit" vs "nağd
     kredit"), and under-collapsing here costs more than over-collapsing --
-    rule 2 is the single largest ingestion win (SPEC §5.3, RECON §5).
+    this dedup is the single largest ingestion win.
     """
     seen: set[str] = set()
     kept: list[Block] = []
@@ -270,8 +267,8 @@ MIN_CHARS = 100  # measured on CHROME-STRIPPED text over the full 550-page cache
 #   genuine short pages:                      124 .. up  (531 pages)
 # There is no overlap left to trade off, so 100 sits in open space -- well clear
 # of 0, with a 24-char margin below /haqqimizda/siyasetlerimiz at 124, the
-# smallest real page in the corpus. Ruling P57's constraint (never let the gate
-# rise past a real page) holds with far more room than either earlier value.
+# smallest real page in the corpus. The constraint that the gate must never
+# rise past a real page holds with far more room than either earlier value.
 
 
 CHROME_MIN_DOCS = 20  # never strip anything in a corpus too small to judge
@@ -325,7 +322,7 @@ def strip_chrome(pages: list[tuple[str, PageText]]) -> tuple[list[tuple[str, Pag
 
     def _keep(x: str) -> bool:
         # Strip only when BOTH over the document-frequency threshold and
-        # long enough to actually dilute an embedding (P88): a short piece
+        # long enough to actually dilute an embedding: a short piece
         # (e.g. the "Müddət" table label) survives even at high frequency.
         return df[_chrome_key(x)] < threshold or len(x) < CHROME_MIN_CHARS
 
@@ -374,7 +371,7 @@ def has_rate_table(text: str) -> bool:
 def strip_rate_numbers(blocks: list[str]) -> list[str]:
     """Drop the bare rate values from a page carrying a rate table.
 
-    A rate is stale the moment it is embedded (SPEC §5.4) and the model will
+    A rate is stale the moment it is embedded and the model will
     quote whatever number it is given -- measured: it answered "1.7020 AZN" from
     a table four days old. Dropping only the bare numeric blocks leaves the
     surrounding labels (USD, EUR, Alış, Satış) and the rest of the page intact,
@@ -393,20 +390,18 @@ class DropRecord(NamedTuple):
 def apply_gates(
     pages: list[tuple[str, PageText]],
 ) -> tuple[list[tuple[str, PageText]], list[DropRecord]]:
-    """SPEC §5.3 rules 4 and 5.
-
-    Rule 4 identifies a page by whichever half actually carries its substance.
+    """Identifies a page by whichever half actually carries its substance.
 
     Hashing title+description would silently delete every page sharing the
     generic site title, so the body is the right key for an ordinary page. But
-    the body is the WRONG key for a root stub (rule 3), whose content is the
+    the body is the WRONG key for a root stub, whose content is the
     question in its title and the answer in its description, above a boilerplate
     body. ABB serves the identical 117-character "ABB mobile" CTA as the body of
     18 such stubs -- /kredit-borcumu-nece-onlayn-odeye-bilerem,
     /ipoteka-odenisimi-nece-ede-bilerem and 16 siblings. Keying those on the body
     collapsed all 18 into whichever one happened to be crawled first and silently
     deleted the other 17, each a distinct high-intent customer question
-    (measured 2026-09-15 over the full 550-page raw cache).
+    (measured over the full 550-page raw cache).
 
     So: key on the body when the body outweighs title+meta, otherwise key on the
     full text. `head` is derived by subtraction rather than re-parsing, because

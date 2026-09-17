@@ -13,9 +13,9 @@ from app.chunking import Chunk, chunk_document, tokens_per_char
 from app.db import get_conn
 from app.embedder import Embedder
 
-# P72: how long a `processing` row may go without a stage heartbeat before a
-# new ingest attempt treats it as abandoned rather than in flight. Named here
-# so the call site reads as policy, not an unexplained literal.
+# How long a `processing` row may go without a stage heartbeat before a new
+# ingest attempt treats it as abandoned rather than in flight. Named here so
+# the call site reads as policy, not an unexplained literal.
 STALE_PROCESSING_AFTER = timedelta(minutes=5)
 
 
@@ -32,18 +32,18 @@ def _schema_dim(conn: psycopg.Connection) -> int:
 
 
 def _stage(conn: psycopg.Connection, row_id: uuid.UUID, stage: str) -> None:
-    """P67: commits immediately so a concurrent observer sees the stage
-    transition (and its updated_at bump) while the ingest is still running,
-    not only once the whole thing finishes -- Task 17's stall detector and
-    P72's staleness check both depend on this being a live signal."""
+    """Commits immediately so a concurrent observer sees the stage transition
+    (and its updated_at bump) while the ingest is still running, not only
+    once the whole thing finishes -- the stall detector and staleness check
+    both depend on this being a live signal."""
     conn.execute("UPDATE rag.corpora SET stage=%s, updated_at=now() WHERE id=%s", (stage, row_id))
     conn.commit()
 
 
 def _product_slug(doc: Document) -> str:
-    """P73: product_facts.product_slug must be a slug, not doc.title -- Task
-    18's golden set and the SPEC §7.3 fact-governance path both read this
-    column as one. Derived from the final non-empty path segment of doc.url
+    """product_facts.product_slug must be a slug, not doc.title -- the golden
+    set and the fact-governance path both read this column as one. Derived
+    from the final non-empty path segment of doc.url
     (a trailing slash, query string, and fragment are ignored), falling back
     to doc.title when the URL has no usable segment (e.g. a bare origin)."""
     url: str = doc.url
@@ -54,7 +54,7 @@ def _product_slug(doc: Document) -> str:
 
 def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
     """Idempotent on (corpus_id, embedding_model). Stages are written to the
-    corpus row as they progress so the UI can poll (SPEC §6.3)."""
+    corpus row as they progress so the UI can poll."""
     # explicit annotation: packages/contracts ships no py.typed marker, so
     # mypy resolves attribute access on an installed (non-stub) Corpus as
     # Any; without this the two `return corpus_id` below trip no-any-return.
@@ -75,10 +75,10 @@ def ingest_corpus(corpus: Corpus, embedder: Embedder) -> str:
         ).fetchone()
         if existing:
             existing_id, status, stale = existing
-            # P72: a `processing` row with no heartbeat in STALE_PROCESSING_AFTER
-            # means the ingest that owned it crashed -- the retry SPEC §6.3
-            # promises must reach these rows, not just ones already marked
-            # `failed` (P66), or a crash leaves the corpus stuck forever.
+            # A `processing` row with no heartbeat in STALE_PROCESSING_AFTER
+            # means the ingest that owned it crashed -- the retry promise
+            # must reach these rows, not just ones already marked `failed`,
+            # or a crash leaves the corpus stuck forever.
             if status == "failed" or (status == "processing" and stale):
                 # Cascades through documents to chunks and product_facts.
                 conn.execute("DELETE FROM rag.corpora WHERE id = %s", (existing_id,))

@@ -15,9 +15,9 @@ from contracts.models import Corpus, Document
 
 def test_returns_top_k_prompt_sources_from_top_k_candidates(seeded_corpus: str, db: Any) -> None:
     result = retrieve(seeded_corpus, "nağd kredit məbləği", FakeEmbedder(dim=8))
-    # P81: the brief's original assertions (`<= 5`, `<= 20`) hold vacuously for an
-    # empty result, so a broken retrieve() that always returns [] would still pass.
-    # Pin the lower bound too, and that sources can never outnumber candidates.
+    # `<= 5`/`<= 20` alone hold vacuously for an empty result, so a broken
+    # retrieve() that always returns [] would still pass. Pin the lower
+    # bound too, and that sources can never outnumber candidates.
     assert result.sources
     assert result.candidates
     assert len(result.sources) <= len(result.candidates)
@@ -27,7 +27,7 @@ def test_returns_top_k_prompt_sources_from_top_k_candidates(seeded_corpus: str, 
 
 def test_sources_are_numbered_from_one_in_retrieval_order(seeded_corpus: str, db: Any) -> None:
     result = retrieve(seeded_corpus, "kredit", FakeEmbedder(dim=8))
-    assert result.sources  # P81: [] == [] would pass this ordering check vacuously
+    assert result.sources  # [] == [] would pass this ordering check vacuously
     assert [s.n for s in result.sources] == list(range(1, len(result.sources) + 1))
     # NOT `result.sources == sorted(result.sources, key=lambda s: -s.score)` any
     # more. Under hybrid retrieval `Source.score` is only the dense cosine
@@ -57,11 +57,11 @@ def test_floor_filters_candidates_below_threshold(
 ) -> None:
     query = "tamamilə əlaqəsiz sual"
     embedder = FakeEmbedder(dim=8)
-    # P83: pin against the opposite first. A floor of 2.0 is above the maximum
+    # Pin against the opposite first. A floor of 2.0 is above the maximum
     # possible cosine score (1.0), so `sources == []` below would also pass if
     # retrieve() were broken and always returned []. Proving the SAME query
-    # returns real results at the real (measured, see task-19-report.md's P82
-    # section) floor shows the emptiness that follows is the floor's doing.
+    # returns real results at the real, measured floor shows the emptiness
+    # that follows is the floor's doing.
     assert retrieve(seeded_corpus, query, embedder).sources != []
     monkeypatch.setattr("app.retrieval.settings.retrieval_floor", 2.0)
     assert retrieve(seeded_corpus, query, embedder).sources == []
@@ -74,10 +74,10 @@ def test_retrieval_meets_the_300ms_budget(seeded_corpus: str, db: Any) -> None:
 def test_every_source_carries_a_listing_url_derived_from_its_own_url(
     seeded_corpus: str, db: Any
 ) -> None:
-    """Invariant 12. The footer target in SPEC §11.2 is computed here, from a
+    """The footer target is computed here, from a
     document that was actually retrieved -- never written by the model."""
     sources = retrieve(seeded_corpus, "kredit", FakeEmbedder(dim=8)).sources
-    assert sources  # P81: an empty list makes the loop below assert nothing
+    assert sources  # an empty list makes the loop below assert nothing
     for s in sources:
         assert s.listing_url and s.url.startswith(s.listing_url)
 

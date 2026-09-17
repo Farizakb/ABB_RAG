@@ -1,12 +1,12 @@
 // apps/web/src/components/SourceLedger.tsx
 //
-// Ruling P112: Source comes from ../api, not a local redefinition — one
+// Source comes from ../api, not a local redefinition — one
 // contract, not two that can drift.
 import type { Source } from "../api";
 
 const HELPLINE = "937 Məlumat Mərkəzi";
 
-/** SPEC §11.2, the ledger's footer row. One link surface, not two: every row
+/** The ledger's footer row. One link surface, not two: every row
  *  above already links the page it cites, so a second call to action under the
  *  answer would print the same thing twice and go unread by the fifth question.
  *

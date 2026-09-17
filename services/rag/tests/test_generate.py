@@ -12,7 +12,7 @@ from contracts.models import Source
 
 
 class FakeClient:
-    """P89: implements the `Completion` Protocol structurally -- no base class
+    """Implements the `Completion` Protocol structurally -- no base class
     needed, matching how `FakeEmbedder` substitutes for `Embedder`."""
 
     def __init__(self, payload: str) -> None:
@@ -123,14 +123,14 @@ def test_the_prompt_forbids_claiming_a_list_is_latest_or_ordered(
     prompt = client.last_prompt.lower()
     assert "never describe a list as the latest" in prompt
     assert "do not number list items" in prompt
-    # P119: forbidding the *claim* was not enough -- the model kept the recency
+    # Forbidding the *claim* was not enough -- the model kept the recency
     # words in a closing disclaimer ("Ən son kampaniyalar üçün ..."), which the
     # eval reads as a recency claim. The phrase itself is banned, not just the claim.
     assert 'never write "ən son"' in prompt
 
 
 def test_build_prompt_numbers_and_orders_sources_matching_their_n() -> None:
-    """P91: `build_prompt` is otherwise only exercised indirectly through
+    """`build_prompt` is otherwise only exercised indirectly through
     `answer`. Pins the two things worth pinning directly: sources appear in
     `[1]`, `[2]`, `[3]` order matching `Source.n`, and each source's own text
     follows its own header rather than another source's."""

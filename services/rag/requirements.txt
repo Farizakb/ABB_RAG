@@ -12,6 +12,6 @@ openai==3.13.0
 # different package from the httpx2 that openai==3.13.0 pulls in transitively.
 # Matches the root requirements-dev.txt pin.
 httpx==0.28.1
-# Task 15: cl100k_base tokenizer for chunking and the Azerbaijani tokens-per-
-# char measurement. Offline once its BPE ranks file is cached (see chunking.py).
+# cl100k_base tokenizer for chunking and the Azerbaijani tokens-per-char
+# measurement. Offline once its BPE ranks file is cached (see chunking.py).
 tiktoken==0.14.0

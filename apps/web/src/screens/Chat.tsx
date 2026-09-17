@@ -1,12 +1,12 @@
 // apps/web/src/screens/Chat.tsx
 //
-// Ruling P112: the answer shape is api.ts's QuestionResponse, not a locally
+// The answer shape is api.ts's QuestionResponse, not a locally
 // redefined mirror.
 import { useRef, useState } from "react";
 import { api, type QuestionResponse } from "../api";
 import { SourceLedger } from "../components/SourceLedger";
 
-// Ruling P113: every RefusalClass gets its own line — unsafe must not fall
+// Every RefusalClass gets its own line — unsafe must not fall
 // into the out_of_scope copy.
 const REFUSAL_LABELS: Record<string, string> = {
   advisory: "Personal assessment — routed to a human channel",
@@ -30,7 +30,7 @@ export function Chat({ corpusId }: { corpusId: string }) {
     try {
       setAnswer(await api.ask(corpusId, question, session.current));
     } catch (err) {
-      // Ruling P114: a failed ask() must land in a visible error state, not
+      // A failed ask() must land in a visible error state, not
       // an unhandled rejection and a blank screen.
       setError(err instanceof Error ? err.message : "Question failed.");
     } finally {
@@ -77,8 +77,7 @@ export function Chat({ corpusId }: { corpusId: string }) {
           footer never appear on an idle screen -- and not at all for a
           small-talk reply (no sources, not refused, not grounded): "Nothing
           retrieved" plus the 937 footer would read as a broken or
-          insufficient answer under a perfectly fine greeting (Task 42 fix
-          round 1, F3). */}
+          insufficient answer under a perfectly fine greeting. */}
       {answer && (answer.sources.length > 0 || answer.refused || answer.grounded) && (
         <SourceLedger sources={answer.sources} insufficient={answer.refused} />
       )}

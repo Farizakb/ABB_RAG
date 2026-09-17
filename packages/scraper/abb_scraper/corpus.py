@@ -44,7 +44,7 @@ def _fact_key(f: Fact) -> tuple[str, float | None, str | None, str | None, str |
 
 
 def _dedupe_facts(facts: list[Fact]) -> list[Fact]:
-    """Task 11's finding: the same stat block pair (value, label) can repeat
+    """The same stat block pair (value, label) can repeat
     verbatim elsewhere on one page -- a responsive mobile/desktop duplicate of
     the same DOM subtree, observed on nagd-kredit.html and
     biznes-sub-kicik-orta.html -- and `extract_facts` does not dedupe its own
@@ -85,9 +85,9 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
         page = extract_page(res.html, res.url)
 
         if has_rate_table(page.text):
-            # A live FX rate table, stripped wherever the widget is embedded
-            # (SPEC §5.4) -- not just on /ferdi/valyuta-mezenneleri's own
-            # volatile page below. Measured 2026-09-15: two more pages carry
+            # A live FX rate table, stripped wherever the widget is embedded --
+            # not just on /ferdi/valyuta-mezenneleri's own
+            # volatile page below. Measured: two more pages carry
             # the identical widget and reach the corpus as ordinary "stub"
             # pages, one of them (/ferdi) a real landing page whose
             # product-card prose must survive -- so only the bare numbers are
@@ -104,15 +104,15 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
             )
 
         if sc == "volatile":
-            # Pointer mode: title and description only, rate body discarded
-            # (SPEC §5.4) -- a rate table is stale the moment it is embedded.
+            # Pointer mode: title and description only, rate body discarded --
+            # a rate table is stale the moment it is embedded.
             #
             # The FAQ is not a rate table and is kept. /ferdi/valyuta-mezenneleri
             # carries 21 Q&A pairs answering things that do not move with the
             # rate -- whether there is a commission, how to see the live rate,
             # which currencies are traded -- and pointer mode was discarding all
             # 21 along with the table, leaving the page's only retrievable text
-            # its own meta description (measured 2026-09-15: 21 pairs, 0 in the
+            # its own meta description (measured: 21 pairs, 0 in the
             # corpus). `[]` as the DOM blocks is deliberate: the body they would
             # have been deduped against is exactly what pointer mode throws away.
             faq = tuple(b.text for b in faq_blocks(res.html, [], path))
@@ -125,7 +125,7 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
             )
 
         if sc == "product":
-            # Facts (Ruling P9): pull the real block list and dedupe it the same
+            # Pull the real block list and dedupe it the same
             # way extract_page's own body is deduped, so a page whose stat block
             # is rendered twice (responsive duplicate DOM) does not double-count
             # here before `_dedupe_facts` even runs below.
@@ -135,7 +135,7 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
         if sc == "campaign":
             status = classify(page.text, today)
             if status.status != "active":
-                # Controller ruling P47: a campaign that classifies "unknown"
+                # A campaign that classifies "unknown"
                 # (no date range, or a start date still in the future) must be
                 # withheld, not shown as active -- and withheld visibly, via a
                 # DropRecord, never by silent omission. Same mechanism covers
@@ -188,15 +188,15 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
 
     if homepage_html and (bank := bank_facts_document(homepage_html)):
         docs.append(bank)
-    # Task 12 Step 2 measured ABB's own listing pages: /ferdi/kreditler already
+    # Measured against ABB's own listing pages: /ferdi/kreditler already
     # enumerates its products (1.00 >= 0.60, no product index), /ferdi/kampaniyalar
     # does not (0.00 < 0.60, campaign index built). Only the campaign branch of
     # index_documents exists; this call is unconditional per that measured verdict.
     # A synthetic index is published at the URL of the real hub page it
     # enumerates. That hub (/ferdi/kampaniyalar, a 320-char client-rendered
-    # shell) used to be dropped by the §5.3 gate, so the two never collided --
-    # but MIN_CHARS is now 250 and the shell clears it, which would emit two
-    # documents under one URL. Retrieval keys chunk text by URL
+    # shell) would otherwise be dropped by the size gate, so the two never
+    # collided -- but the gate is now low enough that the shell clears it,
+    # which would emit two documents under one URL. Retrieval keys chunk text by URL
     # (retrieval.source_texts), so a duplicate silently shadows one of them.
     # The index wins: it carries the enumeration the shell lacks, and the
     # shell's own text is just the heading the index already restates.
@@ -204,7 +204,7 @@ def build_corpus(results: list[FetchResult], today: date) -> tuple[Corpus, list[
     shadowed = {d.url for d in indexes}
     docs = [d for d in docs if d.url not in shadowed] + indexes
 
-    # Task 23 Item 3 Part B: hand-authored pointers for branch/ATM location
+    # Hand-authored pointers for branch/ATM location
     # questions, which the scrape cannot answer (client-side map widget, no
     # addresses ever reach the HTML). `pointer_documents` already resolves the
     # /atmler URL collision -- it returns that page's own Document with the

@@ -14,7 +14,7 @@ FIN = re.compile(
 
 
 def redact(text: str) -> str:
-    """Applied at log-write, before anything is persisted (SPEC §14)."""
+    """Applied at log-write, before anything is persisted."""
     text = CARD.sub("[redacted:card]", text)
     text = PHONE.sub("[redacted:phone]", text)
     return FIN.sub("[redacted:id]", text)

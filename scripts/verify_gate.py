@@ -1,5 +1,5 @@
 # scripts/verify_gate.py
-"""SPEC.md §2 verification gate. Run once, on day one, before any parser exists.
+"""Verification gate. Run once, before any parser exists.
 
 Writes fixtures/raw/*.html and prints a report to paste into RECON.md.
 
@@ -11,10 +11,10 @@ Deviations from the original brief, per task-1 decisions:
 - robots.txt is checked here in Python (identifying UA, one request) instead
   of via a separate curl step.
 
-Fix round 1 (all inside SPEC §2's remit):
+Fix round 1:
 - F1: fetches one real sub-page per biznes segment (one hop below each hub,
   discovered from the hub fixture's own hrefs already on disk) and reports
-  the two signals that decide Task 7's shape: a bullet-separated breadcrumb
+  the two signals that decide the extraction shape: a bullet-separated breadcrumb
   and a rendered value-then-label stat block, both checked in visible text
   (script/style/tags stripped) rather than raw HTML, so JSON-payload false
   positives don't count.
@@ -28,8 +28,8 @@ Fix round 1 (all inside SPEC §2's remit):
 
 Fix round 2:
 - R1: every sleep is now jittered (`1.0 + random.uniform(0, 0.3)`), matching
-  SPEC §5.1's "one request per second with jitter" and the shape Task 6's
-  real Fetcher will use.
+  the "one request per second with jitter" policy and the shape the real
+  Fetcher will use.
 - R2: robots.txt is now enforced, not just parsed and printed. `fetch()` is
   gated by a `urllib.robotparser.RobotFileParser` built from the fetched
   robots.txt; a disallowed URL is skipped (no request made) with a printed

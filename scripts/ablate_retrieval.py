@@ -11,7 +11,7 @@ are separate SQL strings defined here, because production never excludes
 stubs (that is the ADR's own verdict) -- this file is the only place that
 losing option is written down, and only long enough to be measured.
 
-The host cannot reach Postgres (ruling P132), so this runs inside the `rag`
+The host cannot reach Postgres, so this runs inside the `rag`
 container, the same way the `eval` target in Makefile already does:
 
     docker compose cp scripts/ablate_retrieval.py rag:/tmp/ablate_retrieval.py

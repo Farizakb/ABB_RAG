@@ -5,7 +5,7 @@
 
 Costs about four cents (measured: $0.0417 for 85 calls against the live
 model) and doubles as an end-to-end smoke test. Deliberately
-includes both refusal classes so chart two is not a flat line (SPEC §11.3).
+includes both refusal classes so chart two is not a flat line.
 
 `/api/v1/questions` is rate-limited to 30/minute per remote address
 (services/chat/app/routes.py), and every request here arrives from the same

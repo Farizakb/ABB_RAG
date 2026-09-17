@@ -1,8 +1,7 @@
 // apps/web/src/App.tsx
 //
-// Scaffold shell (Task 26), mounting Data (Task 27), Chat (Task 28) and
-// Analytics (Task 30). Chat lays out its own conversation column +
-// right-rail SourceLedger per SPEC.md §11.4, so this shell no longer
+// Scaffold shell, mounting Data, Chat and Analytics. Chat lays out its own
+// conversation column + right-rail SourceLedger, so this shell no longer
 // carries a placeholder <aside> — keeping one here would duplicate the
 // ledger Chat already renders.
 import { useCallback, useState } from "react";
@@ -22,7 +21,7 @@ export default function App() {
 
   return (
     <div style={{ minHeight: "100vh" }}>
-      {/* SPEC §11.4 scopes the 68ch measure to the conversation column, not to
+      {/* The 68ch measure is scoped to the conversation column, not to
           the page: Data sets it on its own section, Chat carries it in the grid
           template, and Analytics is table-first and needs the full width. */}
       <main>
@@ -37,7 +36,7 @@ export default function App() {
               Chat
             </button>
             {/* Not gated on corpusId: it reads the stored interaction record
-                (Task 25's aggregations), which is independent of whatever
+                (server-side aggregations), which is independent of whatever
                 corpus this browser session has loaded. */}
             <button onClick={() => setTab("analytics")}
                     aria-current={tab === "analytics" ? "page" : undefined}>

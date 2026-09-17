@@ -29,8 +29,8 @@ def page(text: str, body: str | None = None) -> PageText:
 
 
 def test_gate_sits_in_the_measured_gap_between_shells_and_real_pages() -> None:
-    """SPEC §5.3 rule 5, measured on CHROME-STRIPPED text over the full 550-page
-    cache 2026-09-15.
+    """Measured on CHROME-STRIPPED text over the full 550-page
+    cache.
 
     The gate mis-calibrated twice because it was sizing text that still held
     site-wide chrome: an empty shell's 190 chars were entirely a generic title
@@ -171,9 +171,9 @@ def test_cross_document_duplicate_bodies_collapse_to_the_first() -> None:
 
 
 def test_two_bodyless_pages_are_not_deduped_against_each_other() -> None:
-    """Ruling P41's crux: `apply_gates`'s `if body and key in seen_bodies:`
+    """`apply_gates`'s `if body and key in seen_bodies:`
     guard exists precisely so an empty body never collides via hash("").
-    Two unrelated bodyless root stubs (SPEC §5.3 rule 3) -- title+meta alone
+    Two unrelated bodyless root stubs -- title+meta alone
     clearing the gate, zero content blocks -- must both survive;
     neither may be dropped as a cross-document-duplicate of the other."""
     kept, dropped = apply_gates(
@@ -192,14 +192,14 @@ def test_every_drop_is_reported_with_its_char_count() -> None:
 
 
 def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None:
-    """Ruling P41 on task 9's brief: `apply_gates` originally recovered the
+    """`apply_gates` originally recovered the
     body positionally with `page.text.split("\\n", 2)[-1]`, which is only
     correct when both a title and a meta description were prepended --
     extract_page's `if p` skips empty parts when joining `text`, so a
     bodyless page (fixtures/raw/stub-empty.html: non-empty title/meta, zero
     content blocks) shifted the split and silently recovered the meta
-    description as if it were the body. SPEC §5.3 rule 3 exists precisely to
-    recover such root stubs, so hashing their description as a "body" would
+    description as if it were the body. Root stubs must be recoverable this
+    way, so hashing their description as a "body" would
     wrongly collapse two unrelated bodyless stubs that happen to share a
     generic description.
 
@@ -211,8 +211,8 @@ def test_positional_body_recovery_matches_actual_body_on_every_fixture() -> None
     dedupe_blocks (the same path extract_page itself takes to build `body`),
     rather than trusting extract_page's own value against itself.
 
-    Count raised 11 -> 13 by Task 12: `listing-kampaniyalar.html` (0 bytes --
-    the real page 404'd, RECON.md's dated day-two heading) and
+    Count raised 11 -> 13: `listing-kampaniyalar.html` (0 bytes --
+    the real page 404'd) and
     `listing-ferdi-kreditler.html` were added to the fixture set, and both
     still need to clear this same positional-recovery check."""
     fixtures = sorted(RAW.glob("*.html"))

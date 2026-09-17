@@ -14,7 +14,7 @@ def test_repeated_block_kept_once() -> None:
 
 
 def test_dedup_is_whitespace_and_case_insensitive() -> None:
-    # Ruling P28: "Nağd  Kredit" (double space) vs "nağd kredit" must collapse
+    # "Nağd  Kredit" (double space) vs "nağd kredit" must collapse
     # to one -- the key must fold both case AND whitespace, not just case.
     _, collapsed = dedupe_blocks([Block("Nağd  Kredit", "p"), Block("nağd kredit", "p")])
     assert collapsed == 1

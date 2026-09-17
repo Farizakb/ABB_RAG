@@ -28,8 +28,7 @@ def parse_range(text: str) -> tuple[date | None, date | None]:
     directly under the page title, ahead of the prose in document order.
     That badge's range (09.09.2026 - 05.06.2027, the union of the four
     phase ranges) is therefore the first match in extracted text, and the
-    four phase ranges that follow it are correctly ignored. See
-    task-10-report.md for the measurement and the raw-HTML evidence.
+    four phase ranges that follow it are correctly ignored.
     """
     m = RANGE.search(text)
     if m is None:
@@ -39,10 +38,10 @@ def parse_range(text: str) -> tuple[date | None, date | None]:
 
 
 def classify(text: str, today: date) -> CampaignStatus:
-    """Derived at scrape time, never curated (invariant 9).
+    """Derived at scrape time, never curated.
 
     An expiry marker takes precedence over date arithmetic when present.
-    As measured (task-10-report.md), neither marker is currently attested
+    As measured, neither marker is currently attested
     in extracted text on any of the 11 sampled fixtures: "Kampaniya artıq
     bitmişdir" occurs zero times anywhere, raw or extracted; "Aktiv deyil"
     occurs only as the JSON fragment '"inactive":"Aktiv deyil"' inside a
@@ -54,19 +53,19 @@ def classify(text: str, today: date) -> CampaignStatus:
 
     A campaign whose `valid_from` is still in the future (strictly after
     `today`; a campaign that starts today is active, not unknown) also
-    classifies `unknown`, not `active` (controller ruling P47, fix round 2).
+    classifies `unknown`, not `active`.
     The status enum is deliberately fixed at active/expired/unknown -- a
     fourth "upcoming" value would ripple into the DB enum and the contracts
     package -- so `unknown` does double duty as "not yet decidable either
     way": a not-yet-started campaign is plainly not `active` (telling a
     customer an offer is available when it isn't is a factual error about a
     financial product) and just as plainly not `expired`. Because the later
-    ingest step drops `unknown` and reports the count (brief Step 5), an
-    upcoming campaign is withheld rather than misrepresented, and its
-    exclusion is visible in the drop report rather than silent. This check
-    sits after the marker branch, not before it, so an explicit expiry
-    marker on a future-dated page still wins and reports `expired` -- P33's
-    marker precedence is unaffected by this addition.
+    ingest step drops `unknown` and reports the count, an upcoming campaign
+    is withheld rather than misrepresented, and its exclusion is visible in
+    the drop report rather than silent. This check sits after the marker
+    branch, not before it, so an explicit expiry marker on a future-dated
+    page still wins and reports `expired` -- marker precedence is
+    unaffected by this addition.
     """
     start, end = parse_range(text)
     if any(mark in text for mark in EXPIRED_MARKERS):

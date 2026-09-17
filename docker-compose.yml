@@ -9,9 +9,9 @@ services:
       EMBEDDING_DIM: "${EMBEDDING_DIM:-1536}"
     volumes: ["pgdata:/var/lib/postgresql/data", "./db/migrations:/migrations:ro", "./db/init:/docker-entrypoint-initdb.d:ro"]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-abb}"], interval: 5s, retries: 10 }
-    # Loopback-only, deliberately (P70): lets host-side `pytest services/rag`
-    # reach Postgres to build its own `_test` database. `rag` (which holds the
-    # OpenAI key) gets no such port -- that absence is a standing ruling.
+    # Loopback-only, deliberately: lets host-side `pytest services/rag` reach
+    # Postgres to build its own `_test` database. `rag` (which holds the
+    # OpenAI key) gets no such port.
     ports: ["127.0.0.1:${DB_PORT:-5432}:5432"]
   rag:
     build: { context: ., dockerfile: services/rag/Dockerfile }
@@ -55,18 +55,4 @@ services:
     profiles: ["scraper"]
     build: { context: ., dockerfile: packages/scraper/Dockerfile }
     volumes: ["./data:/app/data", "./fixtures:/app/fixtures"]
-  # Walkthrough/inspection tool only, never part of the deployed stack:
-  # profile-gated so `docker compose up` / `make demo` never starts it, and
-  # loopback-bound so it is never reachable off this machine. Start it
-  # explicitly with `make db-ui`.
-  pgadmin:
-    profiles: ["tools"]
-    image: dpage/pgadmin4:9
-    environment:
-      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:?set in .env}
-      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:?set in .env}
-      PGADMIN_CONFIG_UPGRADE_CHECK_ENABLED: "False"
-    ports: ["127.0.0.1:${PGADMIN_PORT:-5050}:80"]
-    volumes: ["./deploy/pgadmin/servers.json:/pgadmin4/servers.json:ro"]
-    depends_on: { db: { condition: service_healthy } }
 volumes: { pgdata: }

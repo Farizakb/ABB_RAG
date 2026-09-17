@@ -52,7 +52,7 @@ def fetch_sitemap(client: httpx.Client, host: str = "https://abb-bank.az") -> li
 
 
 def select_urls(entries: list[SitemapEntry], today: date) -> tuple[list[str], dict[str, int]]:
-    """Apply SPEC §5.2. Returns the fetch list and a per-reason exclusion tally."""
+    """Returns the fetch list and a per-reason exclusion tally."""
     cutoff = today - timedelta(days=365)
     keep: list[str] = []
     tally: Counter[str] = Counter()
@@ -68,7 +68,7 @@ def select_urls(entries: list[SitemapEntry], today: date) -> tuple[list[str], di
             continue
         if path.startswith("/kampaniyalar/"):
             # Two-stage filter: lastmod avoids fetching most expired campaigns at all;
-            # the body date range in campaigns.py decides the rest. SPEC §5.4.
+            # the body date range in campaigns.py decides the rest.
             if lastmod is None or lastmod < cutoff:
                 tally["campaign_stale"] += 1
                 continue
@@ -78,7 +78,7 @@ def select_urls(entries: list[SitemapEntry], today: date) -> tuple[list[str], di
             keep.append(loc)
             continue
         if path.count("/") == 1 and len(path) > 1:
-            keep.append(loc)  # root single-segment: the §5.3 gate decides, not a curated list
+            keep.append(loc)  # root single-segment: the extraction gate decides, not a curated list
             continue
         tally["other"] += 1
 

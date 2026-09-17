@@ -80,8 +80,8 @@ class Source(BaseModel):
     title: str
     section_path: list[str]
     url: str
-    # SPEC §11.2 footer target. Invariant 12: derived from `url`, never model
-    # output, and never a trim that is absent from the corpus. Optional in the
+    # The ledger-footer target. Derived from `url`, never model output, and
+    # never a trim that is absent from the corpus. Optional in the
     # type so a mock can omit it; `rag` always populates it, falling back to
     # `url` itself, so the UI never branches on null.
     listing_url: str | None = None

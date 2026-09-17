@@ -191,8 +191,8 @@ def _persist(
 
 
 def _retrieval_from_sources(data: dict[str, Any]) -> list[dict[str, Any]]:
-    """P108: persist `retrieval` as the prompt sources the model actually
-    saw (`data["sources"]`), not rag's internal dense-candidate list
+    """Persist `retrieval` as the prompt sources the model actually saw
+    (`data["sources"]`), not rag's internal dense-candidate list
     (`data.get("retrieval")`, see services/rag/app/retrieval.py's
     `candidates`). The latter is `{document_id, url, score}` with no `n`, so
     analytics.TOP_SOURCES's join on `(s->>'n')::int = c::int` never matched
@@ -214,9 +214,9 @@ def _cost(usage: dict[str, int]) -> float:
     )
 
 
-# P106: window must be `<1-3 digits>d` -- anything else is a 422, not a
-# silent fallback, since a typo'd window would otherwise quietly report on
-# the default 7 days instead.
+# window must be `<1-3 digits>d` -- anything else is a 422, not a silent
+# fallback, since a typo'd window would otherwise quietly report on the
+# default 7 days instead.
 @router.get("/analytics/summary")
 def get_summary(window: str = Query("7d", pattern=r"^\d{1,3}d$")) -> dict[str, Any]:
     return analytics.summary(window)
@@ -228,7 +228,7 @@ def get_interactions(
     offset: int = Query(0, ge=0),
     q: str = Query(""),
 ) -> dict[str, Any]:
-    # P106: limit is clamped into [1, 200] rather than rejected -- pagination
+    # limit is clamped into [1, 200] rather than rejected -- pagination
     # controls are routinely driven by UI state that can overshoot, and that
     # should degrade gracefully rather than 422 the whole screen.
     limit = max(1, min(200, limit))

@@ -26,9 +26,8 @@ def _bank_node(data: object) -> dict[str, object] | None:
     homepage.html`) ships it nested inside a JSON-LD `@graph` array alongside
     `WebSite`/`WebPage`/`BreadcrumbList` sibling nodes, not as a bare object
     or a bare list of one. A version of this function that only checked
-    `data[0] if isinstance(data, list) else data` -- the shape task-12's own
-    brief assumed -- never finds the real node and always returns `None`
-    against the committed fixture.
+    `data[0] if isinstance(data, list) else data` never finds the real node
+    and always returns `None` against the committed fixture.
     """
     if isinstance(data, dict) and isinstance(data.get("@graph"), list):
         candidates: list[object] = data["@graph"]
@@ -43,11 +42,11 @@ def _bank_node(data: object) -> dict[str, object] | None:
 
 
 def bank_facts_document(homepage_html: str) -> Document | None:
-    """SPEC §5.5. One `BankOrCreditUnion` ld+json block on the homepage;
-    take it once. RECON V-7 confirmed the block carries both `address` and
-    `telephone` data -- on the real page, phone numbers sit in a
-    `contactPoint` list (a direct call centre number and the short code
-    "937"), not a top-level `telephone` key, so both are read from there.
+    """One `BankOrCreditUnion` ld+json block on the homepage; take it once.
+    The block carries both `address` and `telephone` data -- on the real
+    page, phone numbers sit in a `contactPoint` list (a direct call centre
+    number and the short code "937"), not a top-level `telephone` key, so
+    both are read from there.
     """
     for node in HTMLParser(homepage_html).css('script[type="application/ld+json"]'):
         try:
@@ -108,16 +107,16 @@ ATMLER_POINTER_TEXT = (
 
 
 def pointer_documents(docs: list[Document]) -> list[Document]:
-    """SPEC §5.5 day-two pre-commitment, triggered: Task 23 Item 3 measured that
-    the §5.5 bank-facts document does not produce a plausible grounded answer to
-    a branch or ATM question -- live probes either refuse (citing unrelated
-    pages) or, worse, cite the Android privacy policy for "where is the nearest
-    ATM". The branch/ATM list is a client-side map widget on abb-bank.az, so no
-    address is ever present in the fetched HTML for retrieval to find (measured:
-    /filiallar has exactly one occurrence of "ünvan" and zero street addresses).
+    """Measured that the bank-facts document does not produce a plausible
+    grounded answer to a branch or ATM question -- live probes either refuse
+    (citing unrelated pages) or, worse, cite the Android privacy policy for
+    "where is the nearest ATM". The branch/ATM list is a client-side map
+    widget on abb-bank.az, so no address is ever present in the fetched HTML
+    for retrieval to find (measured: /filiallar has exactly one occurrence
+    of "ünvan" and zero street addresses).
 
     Both pointers state only that a page exists and what it lists, never a
-    product fact (SPEC §5.5's constraint on any hand-authored pointer) -- no
+    product fact -- no
     address, no hours, no phone number is invented here. Both URLs returned
     HTTP 200 at scrape time (both are in `data/raw`), so invariant 12 holds.
 
@@ -183,7 +182,7 @@ ENUMERATES_THRESHOLD = 0.6  # a real listing page names most of its children
 
 def listing_enumerates(listing_text: str, member_titles: list[str]) -> float:
     """The fraction of a class's members named in its listing page's *extracted*
-    text -- the Step 1 measurement behind SPEC §5.5's day-two decision.
+    text.
 
     Extracted text, not HTML, because only extracted text is retrievable: a page
     can render its children as links and still lose them to the §5.3 chrome
@@ -197,14 +196,14 @@ def listing_enumerates(listing_text: str, member_titles: list[str]) -> float:
 def _abb_already_enumerates(
     listing_url: str, members: list[Document], docs: list[Document]
 ) -> bool:
-    """SPEC §5.5. ABB runs the enumeration query server-side. If their page
-    already names its children, build nothing -- theirs has better ordering,
-    stays current, and is where §11.2's footer link points, so the two can
-    never disagree.
+    """ABB runs the enumeration query server-side. If their page already
+    names its children, build nothing -- theirs has better ordering, stays
+    current, and is where the footer link points, so the two can never
+    disagree.
 
-    A runtime guard, kept even after Step 1's one-off measurement decided
-    whether to write this module's index at all: this decides per ingest, so
-    a corpus scraped after ABB redesigns a listing page does not silently
+    A runtime guard, kept even after the one-off measurement decided whether
+    to write this module's index at all: this decides per ingest, so a
+    corpus scraped after ABB redesigns a listing page does not silently
     grow a competing index.
     """
     listing = next((d for d in docs if d.url.rstrip("/") == listing_url.rstrip("/")), None)
@@ -214,35 +213,35 @@ def _abb_already_enumerates(
 
 
 def index_documents(docs: list[Document]) -> list[Document]:
-    """One index, campaigns only (SPEC §5.5's day-two pre-commitment).
+    """One index, campaigns only.
 
-    Step 1 fetched both of §5.5's named listing pages directly (`RECON.md`'s
-    dated day-two measurement; `docs/adr/0006-*.md`) and measured two
-    different outcomes, not the same one twice:
+    Both of the named listing pages were fetched directly (see
+    `docs/adr/0006-*.md`) and measured two different outcomes, not the same
+    one twice:
 
     - `/ferdi/kreditler` returned real content (2,083 extracted chars, well
-      over the §5.3 400-char gate) naming 6 of its 6 body product cards
-      (the 7th child link found in the raw HTML, "İpoteka", sits inside
+      over the 400-char gate) naming 6 of its 6 body product cards (the 7th
+      child link found in the raw HTML, "İpoteka", sits inside
       `<footer id="footer">` -- confirmed structurally, a genuine nav link,
-      not a §5.3 chrome-stripper bug) -- 1.00 >= 0.60, so ABB already
-      enumerates its own credit products and no product index is built.
-      The losing branch is deleted per SPEC §8.3's rule, not kept behind a
-      condition.
+      not a chrome-stripper bug) -- 1.00 >= 0.60, so ABB already enumerates
+      its own credit products and no product index is built. The losing
+      branch is deleted, not kept behind a condition.
     - `/kampaniyalar` (bare) does not exist at all -- confirmed twice, two
-      different exact URL strings, both HTTP 404 (fix rounds 0 and 1) -- and
-      is absent from the sitemap entirely (0 of 7,042 `<loc>` entries),
-      even though 247 of its own children (`/kampaniyalar/<slug>`) are
-      present there. The real campaigns hub is `/ferdi/kampaniyalar`
-      (fix round 2, controller ruling P51): HTTP 200, but a client-rendered
-      shell -- `extract_page` recovers only 320 chars ("Kampaniyalar", "Ən
-      son kampaniyalar", plus generic ABB-mobile-app boilerplate), under the
-      §5.3 400-char gate, and zero same-prefix child links exist anywhere in
-      its raw HTML. So the campaign index is built because ABB's real hub
-      doesn't enumerate its children (0.00 < 0.60). (That shell was also
-      under the §5.3 gate when it was 400; at the re-measured 250 it now
-      clears the gate, so `build_corpus` drops the shell in favour of this
-      index rather than emitting two documents under one URL.)
-      `_abb_already_enumerates` is still called on every ingest (not skipped
+      different exact URL strings, both HTTP 404 -- and is absent from the
+      sitemap entirely (0 of 7,042 `<loc>` entries), even though 247 of its
+      own children (`/kampaniyalar/<slug>`) are present there. The real
+      campaigns hub is `/ferdi/kampaniyalar`: HTTP 200, but a
+      client-rendered shell -- `extract_page` recovers only 320 chars
+      ("Kampaniyalar", "Ən son kampaniyalar", plus generic ABB-mobile-app
+      boilerplate), under the 400-char gate, and zero same-prefix child
+      links exist anywhere in its raw HTML. So the campaign index is built
+      because ABB's real hub doesn't enumerate its children (0.00 < 0.60).
+      (That shell was also under the gate when it was 400; at the
+      re-measured 250 it now clears the gate, so `build_corpus` drops the
+      shell in favour of this index rather than emitting two documents
+      under one URL.)
+
+    `_abb_already_enumerates` is still called on every ingest (not skipped
       just because this one-off probe found a shell): if ABB ever ships a
       working `/ferdi/kampaniyalar` that server-renders its campaign list, a
       corpus scraped after that redesign stops growing this index

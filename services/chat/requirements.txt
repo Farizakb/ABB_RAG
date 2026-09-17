@@ -8,7 +8,6 @@ pydantic-settings==2.15.0
 psycopg[binary]==3.3.5
 psycopg-pool==3.3.1
 httpx==0.28.1
-# Task 24: SPEC §14 asks for a per-session and per-IP rate limit on
-# POST /api/v1/questions -- "ten lines with slowapi". New dependency: this is
-# that ten-line answer instead of hand-rolling a token bucket.
+# Per-session and per-IP rate limit on POST /api/v1/questions -- "ten lines
+# with slowapi" instead of hand-rolling a token bucket.
 slowapi==0.1.10

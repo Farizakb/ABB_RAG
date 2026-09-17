@@ -12,7 +12,7 @@ from app.routes import internal_router, router
 log = logging.getLogger("rag")
 app = FastAPI(title="ABB Assistant — rag")
 app.include_router(router)
-# P90: un-prefixed, internal-only `POST /answer` -- never routed through nginx.
+# Un-prefixed, internal-only `POST /answer` -- never routed through nginx.
 app.include_router(internal_router)
 
 

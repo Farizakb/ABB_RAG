@@ -10,7 +10,7 @@ CUT_LIST.md
 ABB_DS_SW_CASE_STUDY.docx
 
 # NOTE: docs/ itself is deliberately NOT ignored. docs/adr/, docs/error-analysis.md
-# and docs/demo-script.md are graded deliverables under SPEC §19 and must ship.
+# and docs/demo-script.md are deliverables and must ship.
 
 # Subagent-driven-development scratch: ledger, briefs, reports, review packages.
 .superpowers/
@@ -25,7 +25,7 @@ data/
 
 # NOTE: fixtures/ IS tracked. fixtures/raw/*.html are the gate-captured pages every
 # extraction test asserts against, and fixtures/corpus_sample.json is what lets a
-# reviewer run the app without crawling ABB's production site (SPEC §12).
+# reviewer run the app without crawling ABB's production site.
 
 # --- Python ---
 __pycache__/

@@ -1,12 +1,12 @@
-# services/chat/app/analytics.py   SPEC.md §11.3
+# services/chat/app/analytics.py
 from __future__ import annotations
 
 from typing import Any
 
 from app.db import get_conn
 
-# P104: VOLUME also splits out `refused_unsafe` so the day-by-day chart and
-# the refusal-rate tile both account for all three refusal_class values, not
+# VOLUME also splits out `refused_unsafe` so the day-by-day chart and the
+# refusal-rate tile both account for all three refusal_class values, not
 # just out_of_scope/advisory.
 VOLUME = """
 SELECT date_trunc('day', created_at)::date AS day,
@@ -19,7 +19,7 @@ WHERE created_at > now() - %s::interval
 GROUP BY 1 ORDER BY 1
 """
 
-# P105: filtered by the same window as VOLUME/TOTALS rather than all-time.
+# Filtered by the same window as VOLUME/TOTALS rather than all-time.
 TOP_SOURCES = """
 SELECT s->>'url' AS url, count(*) AS count
 FROM app.interactions i, jsonb_array_elements(i.citations) AS c,
@@ -29,9 +29,9 @@ WHERE NOT i.refused AND (s->>'n')::int = c::int
 GROUP BY 1 ORDER BY 2 DESC LIMIT 10
 """
 
-# Task 42, ruling 6: a small-talk row (grounded=false AND refused=false AND
-# error IS NULL -- a friendly, intentionally-ungrounded, non-refused reply)
-# is excluded from the grounded-rate average's denominator via FILTER, not
+# A small-talk row (grounded=false AND refused=false AND error IS NULL --
+# a friendly, intentionally-ungrounded, non-refused reply) is excluded from
+# the grounded-rate average's denominator via FILTER, not
 # just from its numerator -- an answered-but-never-meant-to-be-grounded row
 # must not dilute the metric at all, and is reported separately as its own
 # count instead.
@@ -65,7 +65,7 @@ def summary(window: str = "7d") -> dict[str, Any]:
         assert totals_row is not None  # count(*) always returns exactly one row
         n, median, grounded, cost, small_talk = totals_row
 
-    # P104: refusal_rate counts all three refusal classes, not just two.
+    # refusal_rate counts all three refusal classes, not just two.
     refused = sum(
         d["refused_out_of_scope"] + d["refused_advisory"] + d["refused_unsafe"] for d in volume
     )
@@ -75,8 +75,8 @@ def summary(window: str = "7d") -> dict[str, Any]:
         "volume_by_day": volume,
         "grounded_rate": float(grounded),
         "refusal_rate": round(refused / total, 3) if total else 0.0,
-        # Task 42, ruling 6: small talk's own count, kept out of grounded_rate
-        # and refusal_rate alike (it is neither grounded nor refused).
+        # Small talk's own count, kept out of grounded_rate and refusal_rate
+        # alike (it is neither grounded nor refused).
         "small_talk_count": small_talk,
         "top_sources": top,
         "totals": {

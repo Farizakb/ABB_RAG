@@ -8,11 +8,9 @@ select = ["E", "F", "I", "UP", "B", "SIM", "PTH", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-# Only paths that exist today. evals/ is created by a later task (24) -- that
-# task must add its own directory back into this list so it stays covered
-# under --strict once it appears (mypy errors on a nonexistent path in
-# `files`, so it can't be listed pre-emptively). packages/ was added by Task
-# 4; services/ was added by Task 14 (services/rag skeleton).
+# Only paths that exist today. evals/ has no directory yet -- add it back into
+# this list once it exists so it stays covered under --strict (mypy errors on
+# a nonexistent path in `files`, so it can't be listed pre-emptively).
 files = ["scripts", "packages", "services"]
 ignore_missing_imports = true
 

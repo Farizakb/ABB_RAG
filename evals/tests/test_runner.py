@@ -87,7 +87,7 @@ def src(url: str, listing_url: str | None = None) -> object:
 
 
 def test_enumeration_with_a_synthetic_index_asserts_completeness() -> None:
-    """SPEC §8.1 branch one. Truncation to the retrieval window fails the case
+    """Truncation to the retrieval window fails the case
     rather than passing it — that is the whole reason the index exists."""
     args: dict[str, bool | list[str]] = dict(
         grounded=True, refused=False, facts=[], class_members=["A", "B", "C"], index_exists=True
@@ -97,7 +97,7 @@ def test_enumeration_with_a_synthetic_index_asserts_completeness() -> None:
 
 
 def test_enumeration_without_an_index_asserts_the_link_and_forbids_a_total_claim() -> None:
-    """SPEC §8.1 branch two. ABB's listing page won the §5.5 measurement, so we
+    """ABB's listing page won the measurement, so we
     hold no complete list — and an answer claiming one is a wrong answer even
     though every sentence in it is cited."""
     args: dict[str, bool | list[str]] = dict(
@@ -132,7 +132,7 @@ def test_latency_table_reports_median_p95_max_in_markdown() -> None:
 
 
 def test_grounded_rate_on_answerable_subset_ignores_non_answerable_rows() -> None:
-    """The budget's denominator is the answerable set only (SPEC §8.4) -- a
+    """The budget's denominator is the answerable set only -- a
     correct refusal on an out-of-scope or advisory item is not grounded and
     must not drag the rate down, nor may it be counted as a free pass."""
     rows = [
@@ -181,7 +181,7 @@ def test_end_to_end_budget_percentiles_the_per_row_sum_not_the_sum_of_percentile
 
 
 def test_headline_is_the_out_of_scope_and_advisory_wrong_answer_rate() -> None:
-    """Finding 2: SPEC §8.2's headline is the out_of_scope+advisory wrong-answer
+    """The headline is the out_of_scope+advisory wrong-answer
     rate, not the all-items rate -- both are real numbers and both are kept,
     but only one is labelled the headline."""
     rows = [
@@ -228,7 +228,7 @@ def test_from_rows_cli_renders_byte_identical_markdown_to_in_memory_rows(
     assert out_path.read_text(encoding="utf-8") == expected
 
 
-# Task 42, ruling 6: small_talk items pass iff refused=false and no sources
+# small_talk items pass iff refused=false and no sources
 # were carried, and stay out of the grounded/citation/refusal-set metrics
 # purely by virtue of their `type` not being "answerable"/"out_of_scope"/
 # "advisory" (score_item's existing type-scoped logic already handles that).

@@ -43,7 +43,7 @@ def _seed_corpus_row(
 ) -> None:
     """Plants a corpora row as if a previous ingest attempt had reached
     `status` and then stalled, without going through ingest_corpus. `age`
-    backdates updated_at so P72's staleness check can be exercised (default:
+    backdates updated_at so the staleness check can be exercised (default:
     just now, i.e. fresh)."""
     db.execute(
         "INSERT INTO rag.corpora (id, content_hash, manifest, status, stage, "
@@ -96,8 +96,8 @@ def test_dimension_mismatch_fails_loudly_rather_than_writing_garbage(db: Any) ->
 
 
 def test_a_failed_corpus_is_retried_and_ends_ready(db: Any) -> None:
-    """P66: a prior attempt that stalled and was marked failed (Task 17) must
-    be retryable, not permanently stuck — SPEC §6.3 promises the UI a retry."""
+    """A prior attempt that stalled and was marked failed must
+    be retryable, not permanently stuck — the UI is promised a retry."""
     c = corpus(1)
     embedder = FakeEmbedder(dim=8)
     _seed_corpus_row(db, c.corpus_id, embedder.model, status="failed")
@@ -113,7 +113,7 @@ def test_a_failed_corpus_is_retried_and_ends_ready(db: Any) -> None:
 
 
 def test_a_processing_corpus_is_not_re_ingested(db: Any) -> None:
-    """P66/P72: a FRESH `processing` row means another ingest is already in
+    """A FRESH `processing` row means another ingest is already in
     flight — re-ingesting concurrently would race it. Pins the opposite
     direction from test_a_stale_processing_corpus_is_retried_and_ends_ready so
     neither test is vacuous."""
@@ -128,9 +128,9 @@ def test_a_processing_corpus_is_not_re_ingested(db: Any) -> None:
 
 
 def test_a_stale_processing_corpus_is_retried_and_ends_ready(db: Any) -> None:
-    """P72: a `processing` row whose updated_at heartbeat has gone silent for
+    """A `processing` row whose updated_at heartbeat has gone silent for
     longer than STALE_PROCESSING_AFTER means the ingest that owned it crashed.
-    SPEC §6.3's retry promise must reach these rows too, not just ones already
+    The retry promise must reach these rows too, not just ones already
     marked `failed` -- otherwise a crash mid-ingest wedges the corpus forever."""
     c = corpus(1)
     embedder = FakeEmbedder(dim=8)
@@ -159,8 +159,8 @@ def test_a_stale_processing_corpus_is_retried_and_ends_ready(db: Any) -> None:
 
 
 def test_product_slug_is_derived_from_the_url_path_not_the_title(db: Any) -> None:
-    """P73: product_facts.product_slug must be a slug -- Task 18's golden set
-    and the SPEC §7.3 fact-governance path both read it as one. Derived from
+    """product_facts.product_slug must be a slug -- the golden set
+    and the fact-governance path both read it as one. Derived from
     the final non-empty URL path segment (trailing slash/query/fragment
     ignored), falling back to the title when the URL has no usable segment."""
     c = Corpus(
@@ -195,7 +195,7 @@ def test_product_slug_is_derived_from_the_url_path_not_the_title(db: Any) -> Non
 
 
 class _StageObserver:
-    """P67 (MAJOR 1): a fake embedder whose embed() opens its OWN pooled
+    """A fake embedder whose embed() opens its OWN pooled
     connection (a second, independent connection to the same test database)
     and reads the corpus row's committed `stage` -- proving the 'embedding'
     transition was actually committed and visible from outside ingest_corpus's
@@ -220,8 +220,8 @@ class _StageObserver:
 
 
 def test_stage_transition_to_embedding_is_committed_before_embed_runs(db: Any) -> None:
-    """P67 (MAJOR 1): stage UPDATEs must commit immediately so a concurrent
-    observer -- Task 17's stall detector -- can see 'embedding' while embed()
+    """Stage UPDATEs must commit immediately so a concurrent
+    observer -- the stall detector -- can see 'embedding' while embed()
     is still running, not only once the whole ingest finishes."""
     c = corpus(1)
     observer = _StageObserver(c.corpus_id)

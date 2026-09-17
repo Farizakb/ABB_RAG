@@ -1,4 +1,4 @@
-// apps/web/src/screens/Analytics.tsx   SPEC.md §11.3
+// apps/web/src/screens/Analytics.tsx
 //
 // Table-first: the two tables (top sources, every question) are the record
 // of truth; the three charts above them only illustrate what the tables
@@ -48,7 +48,7 @@ export function Analytics() {
       {error && <p role="alert">{error}</p>}
       {!summary ? <p className="status">Loading…</p> : <>
       <StatTiles totals={summary.totals} />
-      {/* Task 42: small talk is neither grounded nor refused, so it is called
+      {/* Small talk is neither grounded nor refused, so it is called
           out here rather than silently folded into "Grounded rate" above. */}
       <p className="meta">{summary.small_talk_count} small-talk replies this window (excluded from grounded rate)</p>
 

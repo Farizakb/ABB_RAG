@@ -99,17 +99,17 @@ class RetrievalResult(NamedTuple):
     sources: list[Source]
     candidates: list[dict[str, object]]
     took_ms: int
-    # Task D: built from the same `above` rows as `sources`, keyed by `n` (unique
-    # by construction -- `n` is `i + 1` over `above`) instead of a second query
-    # keyed by URL. The old `source_texts()` collapsed same-document chunks onto
-    # whichever one a URL-keyed dict fetched last -- measured on the live corpus,
-    # 29 of 46 golden questions had >=1 chunk's text discarded this way (see
-    # task-D-brief.md). Field added last so positional unpacking still works.
+    # Built from the same `above` rows as `sources`, keyed by `n` (unique by
+    # construction -- `n` is `i + 1` over `above`) instead of a second query
+    # keyed by URL. A URL-keyed dict collapses same-document chunks onto
+    # whichever one it fetched last -- measured on the live corpus, 29 of 46
+    # golden questions had >=1 chunk's text discarded this way. Field added
+    # last so positional unpacking still works.
     texts: dict[int, str]
 
 
 def listing_url_for(url: str, known: Collection[str]) -> str:
-    """The ledger-footer target for SPEC §11.2.
+    """The ledger-footer target.
 
     Derived from a URL that was actually retrieved, so it cannot be a fabricated
     value (invariant 12). Two guards make it safe:

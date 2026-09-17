@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://abb:abb@db:5432/abb"
     top_k_candidates: int = 20
     top_k_prompt: int = 5
-    retrieval_floor: float = 0.0  # set on day three from the measured distribution
+    retrieval_floor: float = 0.0  # set from the measured score distribution
     max_output_tokens: int = 700
 
 

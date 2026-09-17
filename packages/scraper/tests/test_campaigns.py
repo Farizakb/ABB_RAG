@@ -43,10 +43,10 @@ def test_active_when_valid_to_is_exactly_today() -> None:
 
 
 def test_unknown_when_start_date_is_in_the_future() -> None:
-    """Ruling P47 (fix round 2): a campaign that hasn't started yet is not
+    """A campaign that hasn't started yet is not
     active -- telling a customer an offer is available when it isn't is a
     factual error about a financial product -- and not expired either, so
-    it classifies unknown. Step 5 drops unknown and reports the count, so
+    it classifies unknown. Ingest drops unknown and reports the count, so
     an upcoming campaign is withheld rather than misrepresented, visibly
     rather than silently."""
     c = classify("01.10.2026 - 31.10.2026", TODAY)
@@ -54,7 +54,7 @@ def test_unknown_when_start_date_is_in_the_future() -> None:
 
 
 def test_active_when_start_date_is_exactly_today() -> None:
-    """Boundary for P47's new guard: `start > today`, not `start >= today` --
+    """Boundary for the future-start guard: `start > today`, not `start >= today` --
     a campaign launching today is active on its own launch day, not
     withheld as unknown. Pairs with test_active_when_valid_to_is_exactly_today
     as the other end of the same window."""
@@ -63,7 +63,7 @@ def test_active_when_start_date_is_exactly_today() -> None:
 
 
 def test_expiry_marker_on_a_future_dated_campaign_still_wins() -> None:
-    """P33's marker precedence survives P47's addition: the marker branch
+    """Marker precedence survives the future-start addition: the marker branch
     runs before the future-start check, so an explicit expiry marker on a
     page whose date range is entirely in the future still reports expired,
     not unknown."""
@@ -73,7 +73,7 @@ def test_expiry_marker_on_a_future_dated_campaign_still_wins() -> None:
 
 def test_explicit_expiry_marker_confirms_but_does_not_replace_the_date_check() -> None:
     """Active pages carry no positive marker, so the date is the decision and the
-    marker is corroboration only (SPEC §5.4)."""
+    marker is corroboration only."""
     assert classify("Kampaniya artıq bitmişdir", TODAY).status == "expired"
     assert classify("01.09.2026 - 31.10.2026 Aktiv deyil", TODAY).status == "expired"
 
@@ -83,7 +83,7 @@ def test_no_date_and_no_marker_is_unknown_not_active() -> None:
 
 
 def test_kampaniya_active_resolves_the_campaigns_own_range_not_a_phase() -> None:
-    """Ruling P32. kampaniya-active.html carries five distinct dd.mm.yyyy
+    """kampaniya-active.html carries five distinct dd.mm.yyyy
     ranges once comment-node fragmentation is bridged by extraction, not
     four: a campaign-validity badge (calendar icon + "09.09.2026 -
     05.06.2027", rendered in a <p class="...text-content-tertiary"> right
@@ -134,7 +134,7 @@ def test_kampaniya_active_resolves_the_campaigns_own_range_not_a_phase() -> None
 
 
 def test_kampaniya_active_expiry_marker_is_not_attested_in_extracted_text() -> None:
-    """Ruling P33/P34. Neither expiry marker reaches extracted text on this
+    """Neither expiry marker reaches extracted text on this
     fixture: "Kampaniya artıq bitmişdir" is absent from the raw HTML too (so
     it has no presence proof and is not asserted here), and "Aktiv deyil"
     is present in the raw HTML only as the JSON i18n fragment
@@ -142,7 +142,7 @@ def test_kampaniya_active_expiry_marker_is_not_attested_in_extracted_text() -> N
     strips before block extraction ever runs.
 
     The absence assertion below is paired with proof the raw fixture really
-    contains the string (P34): without that proof, an absence assertion
+    contains the string: without that proof, an absence assertion
     against a string the fixture never had would pass regardless of whether
     the code does anything."""
     html = load("kampaniya-active")

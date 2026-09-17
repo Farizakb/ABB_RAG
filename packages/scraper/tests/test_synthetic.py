@@ -57,15 +57,15 @@ def test_listing_enumerates_measures_the_named_fraction_of_a_classes_members() -
 
 # ------------------------------------------------------------------ conditional
 #
-# Step 1 (RECON.md dated day-two heading; docs/adr/0006-*.md) measured the two
-# named classes differently, not the same outcome twice: `/ferdi/kreditler`
-# names 6/6 of its real body product cards in extracted text (1.00 >= 0.60,
-# ABB already enumerates -- no product index), while `/kampaniyalar` returned
-# HTTP 404 on direct fetch (no listing page exists to defer to -- campaign
-# index built). So only the campaign half of Step 3's conditional block below
-# is written; `test_product_index_is_built_per_section_from_the_breadcrumb`
-# is dropped along with the product branch of `index_documents` per SPEC
-# §8.3's rule (the losing option is deleted, not kept behind a condition).
+# Measured (docs/adr/0006-*.md) the two named classes differently, not the
+# same outcome twice: `/ferdi/kreditler` names 6/6 of its real body product
+# cards in extracted text (1.00 >= 0.60, ABB already enumerates -- no
+# product index), while `/kampaniyalar` returned HTTP 404 on direct fetch
+# (no listing page exists to defer to -- campaign index built). So only the
+# campaign half of the conditional block below is written;
+# `test_product_index_is_built_per_section_from_the_breadcrumb` is dropped
+# along with the product branch of `index_documents` (the losing option is
+# deleted, not kept behind a condition).
 
 
 def test_campaign_index_lists_every_active_campaign_with_its_url() -> None:
@@ -97,8 +97,8 @@ def test_no_index_document_claims_recency() -> None:
 
     Completeness is *not* banned here: a synthetic index is built from every member
     of its class, so "bütün məhsullar" is true. Completeness language is forbidden
-    only in the other §5.5 branch, where ABB's page won and we hold no index -- that
-    is asserted in the eval set (Task 18), not here."""
+    only in the other branch, where ABB's page won and we hold no index -- that
+    is asserted in the eval set, not here."""
     docs = [
         doc("https://abb-bank.az/kampaniyalar/a", "A", "campaign", vt=date(2026, 10, 31)),
         doc("https://abb-bank.az/ferdi/kreditler/b", "B", "product", ["Fərdi", "Kreditlər"]),
@@ -112,7 +112,7 @@ def test_no_index_document_claims_recency() -> None:
 
 
 def test_index_is_anchored_to_a_real_listing_page_so_the_citation_resolves() -> None:
-    """Fix round 2 (controller ruling P51): the bare `/kampaniyalar` is
+    """The bare `/kampaniyalar` is
     confirmed absent from the site (two direct 404s, and absent from the
     sitemap's 7,042 entries even though 247 of its own children are
     present). The real, HTTP-200 campaigns hub is `/ferdi/kampaniyalar`
@@ -131,9 +131,9 @@ def test_index_documents_are_never_built_from_other_index_documents() -> None:
 
 
 def test_no_synthetic_index_when_abbs_own_listing_page_already_enumerates() -> None:
-    """SPEC §5.5 day-two pre-commitment. ABB runs this query server-side; if their
+    """ABB runs this query server-side; if their
     page enumerates, theirs wins on ordering, maintenance, and a URL that stays
-    correct -- and the answer can then never disagree with §11.2's redirect."""
+    correct -- and the answer can then never disagree with the redirect."""
     members = [
         doc("https://abb-bank.az/kampaniyalar/a", "Kampaniya A", "campaign", vt=date(2026, 10, 31)),
         doc("https://abb-bank.az/kampaniyalar/b", "Kampaniya B", "campaign", vt=date(2026, 12, 1)),
@@ -165,9 +165,9 @@ def test_synthetic_index_is_still_built_when_the_listing_page_is_a_client_render
 
 
 def test_exactly_at_the_060_threshold_counts_as_already_enumerates() -> None:
-    """Fix round 3. `ENUMERATES_THRESHOLD` (0.60) is SPEC §5.5's pre-committed
+    """`ENUMERATES_THRESHOLD` (0.60) is the pre-committed
     rule deciding whether a synthetic index exists at all, not a readability
-    heuristic (contrast `facts.MAX_FRAGMENT_CHARS`, left unpinned under P48) --
+    heuristic (contrast `facts.MAX_FRAGMENT_CHARS`, left unpinned) --
     so its boundary is pinned here. A mutation of `_abb_already_enumerates`'s
     `>=` to `>` left the whole suite green before this test existed.
 
@@ -196,10 +196,10 @@ def test_exactly_at_the_060_threshold_counts_as_already_enumerates() -> None:
     )
 
 
-# --------------------------------------------------- Task 23 Item 3 Part B: pointers
+# --------------------------------------------------------------- pointers
 #
-# SPEC §5.5's pre-commitment: "No pointer unless the §5.5 bank-facts document
-# fails to produce a plausible grounded answer." Measured, live, 2026-09-15: it
+# Pre-commitment: "No pointer unless the bank-facts document
+# fails to produce a plausible grounded answer." Measured, live: it
 # fails for branch and ATM location questions -- either a refusal citing
 # unrelated pages, or (worse) a grounded-looking answer citing the Android
 # privacy policy. The branch/ATM list is a client-side map widget, so no
@@ -207,7 +207,7 @@ def test_exactly_at_the_060_threshold_counts_as_already_enumerates() -> None:
 
 
 def test_pointer_bodies_state_no_number_and_no_product_fact() -> None:
-    """SPEC §5.5's constraint on any hand-authored pointer: it may state that
+    """The constraint on any hand-authored pointer: it may state that
     a page exists and what it lists, and must never state a product fact.
     Checked with no scraped /atmler present, so both pointers are their own,
     unmerged text -- the standalone form the constraint is written about."""

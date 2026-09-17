@@ -23,9 +23,9 @@ run-once scraper.
   to load the corpus) and Node 20 for the web tests.
 - **Windows:** `make` isn't installed by default (`winget install ezwinports.make` or WSL); every
   target in the table below also has its raw command.
-- Every other setting (`LLM_MODEL`, `EMBEDDING_MODEL`, Postgres credentials, ports, pgAdmin
-  login) already has a working default in `.env.example` — see that file for what each does, and
-  change one only on conflict with something else already listening.
+- Every other setting (`LLM_MODEL`, `EMBEDDING_MODEL`, Postgres credentials, ports) already has a
+  working default in `.env.example` — see that file for what each does, and change one only on
+  conflict with something else already listening.
 
 ---
 
@@ -43,7 +43,7 @@ Nothing else needs editing — every other value in `.env.example` already has a
 | Run tests | `make test` | `pytest packages`; `PYTHONPATH=packages/contracts pytest services/rag`; `PYTHONPATH=packages/contracts pytest services/chat`; `PYTHONPATH=services/rag:packages/contracts pytest evals`; `cd apps/web && npm test -- --run` |
 | Eval, free | `make eval-mock` | `CID=$(python scripts/ingest_fixture.py fixtures/corpus_sample.json)`; `docker compose cp evals rag:/tmp/evals`; `MSYS_NO_PATHCONV=1 docker compose exec -T -e PYTHONPATH=/app -w /tmp rag python evals/runner.py --golden evals/golden.jsonl --corpus-id $CID --mock --out /tmp/report.md` |
 | Eval, real (~$0.10 / 64 items) | `make eval` | same as above, without `--mock`, then `docker compose cp rag:/tmp/report.md evals/report.md` |
-| DB inspector | `make db-ui` | `docker compose --profile tools up -d pgadmin`, then open `http://127.0.0.1:5050` |
+| DB inspector | — | `docker compose exec db psql -U abb abb` |
 | Tail logs | `make logs` | `docker compose logs -f` |
 | Container status | `make ps` | `docker compose ps` |
 
@@ -60,12 +60,6 @@ until the corpus reaches `ready`.
 Opening `http://localhost:8080` after `make demo`: the Data screen already shows a processed
 corpus ("already ingested" fast path), the Chat tab is unlocked, and Analytics is populated with
 seeded history — no empty charts.
-
-pgAdmin (`make db-ui`) is profile-gated and loopback-only — it never starts with `make up`/`demo`.
-Log in with `PGADMIN_DEFAULT_EMAIL` / `PGADMIN_DEFAULT_PASSWORD` from `.env`; the `ABB RAG db`
-server is pre-registered via `deploy/pgadmin/servers.json`, which assumes the default
-`POSTGRES_USER`/`POSTGRES_DB` — if you changed those in `.env`, re-enter the credentials in
-pgAdmin's connection dialog.
 
 **Windows without `make`:** run the raw commands from Git Bash — `make` only saves typing.
 (`MSYS_NO_PATHCONV=1` stops Git Bash rewriting `/tmp` into a Windows path.)
@@ -146,9 +140,6 @@ flowchart TB
     chat -->|"writes every interaction"| db
     rag -->|"chunks, embeddings, product facts"| db
     rag -->|"embeddings and generation"| openai
-
-    pgadmin["pgadmin -- profile tools, 127.0.0.1:5050 only"]
-    pgadmin -.-> db
 ```
 
 - **The scraper is not in the request path.** It is a run-once CLI plus a `profiles: ["scraper"]`
@@ -159,8 +150,6 @@ flowchart TB
   cross-schema reads.
 - **The browser never calls `rag` directly**, except through nginx's `/api/v1/corpora` route;
   `rag`'s `/answer` is internal and publishes no port.
-- **pgAdmin is profile-gated and loopback-bound**, so it never starts during `docker compose up`
-  or `make demo`.
 - **The `web → chat → rag` hop is the microservice seam R8 asks for.** At the corpus's current
   size (736 chunks) a single service would be simpler and faster to ship; the split exists because
   the brief asks for it, and because request-and-record concerns change for product reasons while
@@ -289,8 +278,6 @@ would be wrong and the inbound chain would need to be trusted instead.
 - **Healthchecks and restart policies** on every long-running container (`db`, `rag`, `chat`,
   `web`): `restart: unless-stopped`, gating startup ordering via `depends_on: { condition:
   service_healthy }`.
-- **pgAdmin** is `profiles: ["tools"]` (never starts with `up`/`demo`) and bound to
-  `127.0.0.1:5050` only; credentials come from required `.env` variables with no built-in default.
 - Non-root containers, multi-stage/pinned images, parameterised SQL throughout, no stack traces or
   secrets in error responses.
 

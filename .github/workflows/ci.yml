@@ -30,7 +30,7 @@ jobs:
           done
       # services/rag/app and services/chat/app are both top-level package `app`,
       # so a single bare pytest run can't import both. Run per project instead,
-      # and skip any project a later task hasn't created yet rather than going red.
+      # and skip any project that doesn't exist yet rather than going red.
       - run: |
           if [ -d packages ]; then pytest packages; fi
           if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi

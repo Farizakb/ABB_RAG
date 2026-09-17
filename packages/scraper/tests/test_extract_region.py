@@ -20,7 +20,7 @@ def test_breadcrumb_yields_section_path_and_title() -> None:
 
 
 def test_front_loaded_chrome_is_dropped() -> None:
-    """Ruling P34: every absence-assertion is paired with proof the fixture
+    """Every absence-assertion is paired with proof the fixture
     actually contains the string, so a test that can never fail is visible
     as such rather than reading as coverage. All four chrome strings below
     are confirmed present in nagd-kredit.html (raw counts: 'Tel:' x2,
@@ -60,7 +60,7 @@ def test_feedback_marker_terminates_the_region() -> None:
 
 
 def test_inline_markup_is_kept_not_dropped() -> None:
-    """Ruling P36: a block's text includes text of inline descendants
+    """A block's text includes text of inline descendants
     (strong/em/b/i/small/...) and excludes only descendants that are
     themselves block-level. `<strong>10.9%</strong>` must survive -- a
     silently truncated interest rate is the worst failure mode for a bank
@@ -73,7 +73,7 @@ def test_inline_markup_is_kept_not_dropped() -> None:
 
 def test_nagd_kredit_faq_headings_survive_inline_markup() -> None:
     """The four FAQ sub-headings on nagd-kredit are real <h2>/<h3> elements
-    whose text sits behind inline markup; before P36 they were silently
+    whose text sits behind inline markup; before this fix they were silently
     dropped entirely (own text was empty once inline descendants were
     excluded)."""
     html = load("nagd-kredit")
@@ -108,7 +108,7 @@ def test_biznes_pages_share_the_product_page_shape(name: str, path: str) -> None
 
 
 def test_kampaniya_page_recovers_a_navigational_breadcrumb() -> None:
-    """Ruling P35: breadcrumb detection is the WAI-ARIA landmark alone, no
+    """Breadcrumb detection is the WAI-ARIA landmark alone, no
     href-prefix validation. kampaniya-active.html has a real
     <nav aria-label="breadcrumb"> whose trail links (/ferdi,
     /ferdi/kampaniyalar) are a navigational hierarchy, not the page's own
@@ -152,8 +152,8 @@ def test_page_without_a_breadcrumb_falls_back_to_h1() -> None:
     ],
 )
 def test_biznes_sub_pages_second_strategy(name: str, path: str, expected_crumbs: list[str]) -> None:
-    """The deeper biznes/** page shapes (captured for the SPEC §2 verification
-    gate). Exercises the same landmark/widget-exclusion region strategy as the
+    """The deeper biznes/** page shapes. Exercises the same
+    landmark/widget-exclusion region strategy as the
     hub pages above, on pages one level deeper in the hierarchy."""
     blocks, crumbs = content_blocks(load(name), path)
     assert crumbs[:1] == expected_crumbs[:1]

@@ -26,11 +26,11 @@ def page(title: str, body_chars: int = 900) -> str:
     )
 
 
-# Task 23 Item 3 Part B: `pointer_documents` unconditionally adds these two
-# hand-authored pointers to every corpus (SPEC §5.5 -- ABB's branch/ATM
+# `pointer_documents` unconditionally adds these two
+# hand-authored pointers to every corpus (ABB's branch/ATM
 # situation does not depend on which pages a given scrape happened to fetch).
 # Tests below that assert "nothing reaches the corpus" from these tiny,
-# single-page fixtures predate Part B and must now look past the pointers to
+# single-page fixtures must look past the pointers to
 # the pages they are actually pinning the drop behaviour of.
 POINTER_URLS = {"https://abb-bank.az/filiallar", "https://abb-bank.az/atmler"}
 
@@ -69,7 +69,7 @@ def test_stats_report_fetched_kept_and_dropped() -> None:
 
 
 def test_index_documents_are_appended_after_the_gates_have_run() -> None:
-    """Task 12 Step 2 measured ABB's own listing pages and decided to build a
+    """Measured ABB's own listing pages and decided to build a
     campaign-only index; see synthetic.py's `index_documents`."""
     results = [r("/kampaniyalar/new", page("Yeni").replace("</p>", "01.09.2026 - 31.10.2026</p>"))]
     corpus, _ = build_corpus(results, TODAY)
@@ -80,7 +80,7 @@ def test_index_documents_are_appended_after_the_gates_have_run() -> None:
 
 
 def test_unknown_campaign_with_no_date_range_is_dropped_and_reported() -> None:
-    """Controller ruling P47: a campaign page carrying no parseable date range
+    """A campaign page carrying no parseable date range
     classifies `unknown` (campaigns.classify), never `active`. It must be
     withheld from the corpus and the drop visibly reported, not silently
     omitted -- the same DropRecord mechanism as `campaign-expired`."""
@@ -92,7 +92,7 @@ def test_unknown_campaign_with_no_date_range_is_dropped_and_reported() -> None:
 
 
 def test_future_dated_campaign_is_dropped_as_unknown_not_active() -> None:
-    """P47's other unknown case: a campaign whose validity window has not
+    """The other unknown case: a campaign whose validity window has not
     started yet must not be shown as active. Start date 2026-10-01 is after
     TODAY (2026-09-14)."""
     html = page("Gələcək kampaniya").replace("</p>", "01.10.2026 - 31.10.2026</p>")
@@ -117,9 +117,8 @@ def test_unknown_campaign_drop_is_counted_in_corpus_stats() -> None:
 
 
 def test_facts_are_extracted_for_product_pages() -> None:
-    """Controller ruling P9 (load-bearing): the brief's own reference
-    implementation calls `extract_facts([], title, url) if sc != "product"
-    else []`, which is both an inverted condition and an empty block list --
+    """A naive implementation calling `extract_facts([], title, url) if sc != "product"
+    else []` is both an inverted condition and an empty block list --
     zero facts ever reach the corpus. This pins the fix: a real stat block on
     a product page must produce a governed Fact row, and its figure must be
     retrievable in `Document.text` via `reassemble`."""
@@ -138,7 +137,7 @@ def test_facts_are_extracted_for_product_pages() -> None:
 
 
 def test_facts_are_not_extracted_outside_product_pages() -> None:
-    """The other half of ruling P9's gate: a non-product page carrying the
+    """The other half of the gate: a non-product page carrying the
     exact same stat-block shape must not produce facts -- extract_facts is
     only ever called for source_class == "product"."""
     html = (
@@ -156,7 +155,7 @@ def test_facts_are_not_extracted_outside_product_pages() -> None:
 
 
 def test_cross_block_duplicate_facts_collapse_to_one_row() -> None:
-    """Task 11's finding: a repeated stat block pair on one page (a
+    """A repeated stat block pair on one page (a
     responsive mobile/desktop duplicate of the same DOM, observed on
     nagd-kredit.html and biznes-sub-kicik-orta.html) produces more than one
     raw `Fact` row. Proven below that two raw rows really survive
@@ -235,7 +234,7 @@ VOLATILE_TITLE = (
 
 
 def test_volatile_page_is_stored_as_a_pointer_not_full_body() -> None:
-    """SPEC §5.4 pointer mode: title and description only, real body discarded
+    """Pointer mode: title and description only, real body discarded
     (exchange rates change daily and would go stale in the corpus).
 
     The gate now sizes the POINTER, not the pre-truncation page: `strip_chrome`
@@ -272,7 +271,7 @@ def test_no_two_documents_ever_share_a_url() -> None:
     assert "aktiv" in hub[0].text.lower()
 
 
-# ------------------------------------------------------ Task 23 Item 3 Part A
+# ------------------------------------------------------ rate table stripping
 
 
 def test_rate_table_numbers_are_stripped_but_prose_survives() -> None:
@@ -365,7 +364,7 @@ def _flight_faq(slug: str, question: str, answer: str) -> str:
 
 
 def test_volatile_pointer_keeps_its_faq_while_discarding_the_rate_body() -> None:
-    """The rate table goes stale and is discarded (SPEC §5.4); the FAQ does not.
+    """The rate table goes stale and is discarded; the FAQ does not.
 
     /ferdi/valyuta-mezenneleri carries 21 Q&A pairs that answer things
     independent of the rate — whether there is a commission, how to read the

@@ -1,4 +1,4 @@
-.PHONY: setup scrape up down ingest demo eval eval-mock test lint reset-data db-ui logs ps
+.PHONY: setup scrape up down ingest demo eval eval-mock test lint reset-data logs ps
 # Creates .env from .env.example if missing, then checks OPENAI_API_KEY is set
 # to something other than the placeholder -- never prints the value either way.
 setup:
@@ -13,9 +13,6 @@ up:      ; docker compose up -d --build --wait
 down:    ; docker compose down
 logs:    ; docker compose logs -f
 ps:      ; docker compose ps
-# Walkthrough tool only: loopback-bound (127.0.0.1:5050), profile-gated so it
-# never starts with `up`/`demo`, and never part of the deployed stack.
-db-ui:   ; docker compose --profile tools up -d pgadmin
 ingest:  ; python scripts/ingest_fixture.py fixtures/corpus_sample.json
 demo:
 	docker compose up -d --build --wait
@@ -24,9 +21,9 @@ demo:
 	 echo "Open http://localhost:8080 - corpus $$CID is ready with seeded history."
 # `rag` is the only container holding OPENAI_API_KEY and the only one that can
 # reach Postgres by its compose hostname (`db`) -- psycopg from the host hits
-# psycopg_pool PoolTimeout even with a correct DSN (P132). So the golden set
-# is copied into `rag` and the runner executes there; the host only needs
-# httpx to derive/ingest the corpus id first, the same dependency `make demo`
+# psycopg_pool PoolTimeout even with a correct DSN. So the golden set is
+# copied into `rag` and the runner executes there; the host only needs httpx
+# to derive/ingest the corpus id first, the same dependency `make demo`
 # already has.
 # Free: FakeEmbedder for the query side, evals/runner.py's fixed-answer mock
 # client -- no OpenAI calls. Ingest is a no-op if the fixture is already
@@ -47,7 +44,7 @@ eval:
 	 docker compose cp rag:/tmp/report.md evals/report.md
 # services/rag/app and services/chat/app are both top-level package `app`, so a
 # single bare pytest run can't import both. Run per project instead, and skip
-# any project a later task hasn't created yet rather than going red.
+# any project that doesn't exist yet rather than going red.
 test:
 	if [ -d packages ]; then pytest packages; fi
 	if [ -d services/rag ]; then PYTHONPATH=packages/contracts pytest services/rag; fi
