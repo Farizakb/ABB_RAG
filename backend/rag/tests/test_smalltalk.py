@@ -48,7 +48,7 @@ def test_small_talk_passes_through_as_a_friendly_non_refusal(seeded_corpus: str,
 
 
 def test_small_talk_that_leaks_a_number_falls_back_to_refusal(seeded_corpus: str, db: Any) -> None:
-    """Ruling 4: a model that mislabels a real banking answer as small_talk to
+    """A model that mislabels a real banking answer as small_talk to
     dodge the cite-or-refuse gate must still be caught."""
     payload = json.dumps(
         {

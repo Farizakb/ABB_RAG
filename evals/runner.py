@@ -110,8 +110,7 @@ def score_item(
         # Generic, not type-scoped: only meaningful when grounded, so a
         # small_talk_adversarial item that resolves as a genuine grounded
         # bank_question answer is included here same as any answerable item,
-        # and one that refuses is excluded -- fix round 1, F2's "exclude from
-        # grounded/citation metrics only if they refuse".
+        # and one that refuses is excluded from grounded/citation metrics.
         "citation_present": bool(sources) if grounded else None,
         "refusal_correct": refusal_correct,
         "include_ok": include_ok,

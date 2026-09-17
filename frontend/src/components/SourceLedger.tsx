@@ -61,7 +61,7 @@ export function SourceLedger({ sources, insufficient }: {
                 <td>
                   <a href={s.url} target="_blank" rel="noreferrer">{s.title}</a>
                   <div className="meta">{s.section_path.join(" › ")}</div>
-                  {/* Ruling: index + attribute keeps the key unique even when two
+                  {/* Index + attribute keeps the key unique even when two
                       facts on the same source share an attribute name. */}
                   {s.facts.map((f, i) => (
                     <div key={`${i}-${f.attribute}`}>

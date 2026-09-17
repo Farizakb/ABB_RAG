@@ -170,7 +170,7 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
     `%`, `AZN`/`₼`, a URL, a price/condition word from a small multilingual
     lexicon, or an over-length reply -- otherwise it is routed through
     `_refuse(...)` exactly like a failed grounding check, because a real bank
-    fact (or an instruction to relabel one as small talk, fix round 1's F1)
+    fact (or an instruction to relabel one as small talk)
     was smuggled past the intent gate. Residual risk, stated honestly: a
     lexicon is never exhaustive, so a fact phrased with none of its words can
     still slip through. This is one layer among four (prompt rule 2, the
@@ -209,7 +209,7 @@ def answer(corpus_id: str, question: str, embedder: Embedder, client: Completion
 
     if out.intent == "small_talk":
         if _leaks_bank_content(out.answer):
-            # Ruling 4: a small_talk label the model attached to an answer
+            # A small_talk label the model attached to an answer
             # that still carries a fact must not dodge the cite-or-refuse
             # gate -- treat it exactly like a failed grounding check.
             leak_klass: RefusalClass = "advisory" if _looks_advisory(question) else "out_of_scope"
@@ -327,7 +327,7 @@ _SMALL_TALK_MAX_CHARS = 400
 
 
 def _leaks_bank_content(answer: str) -> bool:
-    """Ruling 4's grounding-escape guard, hardened by fix round 1 (F1): a
+    """Grounding-escape guard: a
     `small_talk`-labelled answer must carry nothing that looks like a
     published bank fact -- a digit, a `%` sign, an AZN/₼ currency mark, a URL,
     a price/condition word from `_CLAIM_PATTERN`, or a reply over
