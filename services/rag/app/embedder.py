@@ -9,6 +9,14 @@ from openai import OpenAI
 from app.config import settings
 
 BATCH = 100
+# Embedding calls serve both a single short query string (on the chat->rag
+# `/answer` path, budgeted against routes.py's 60s call timeout) and ingest's
+# batches of up to BATCH chunk texts (a background task, not on that budget).
+# A longer timeout than generation's needs headroom for the larger batches;
+# max_retries keeps a single slow attempt from running under the SDK's
+# 10-minute default before this is treated as a failure.
+EMBED_TIMEOUT_S = 30.0
+EMBED_MAX_RETRIES = 2
 
 
 class Embedder(Protocol):
@@ -24,7 +32,11 @@ class OpenAIEmbedder:
     def __init__(self, model: str | None = None, dim: int | None = None) -> None:
         self.model = model or settings.embedding_model
         self.dim = dim or settings.embedding_dim
-        self._client = OpenAI(api_key=settings.openai_api_key)
+        self._client = OpenAI(
+            api_key=settings.openai_api_key,
+            timeout=EMBED_TIMEOUT_S,
+            max_retries=EMBED_MAX_RETRIES,
+        )
 
     def embed(self, texts: list[str]) -> list[list[float]]:
         out: list[list[float]] = []

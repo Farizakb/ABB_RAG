@@ -19,6 +19,11 @@ from app.embedder import Embedder
 from app.retrieval import retrieve
 
 PROMPT_VERSION = "answer_v2"
+# chat's call into rag (services/chat/app/routes.py) gives up after 60s;
+# comfortably under that so a stalled OpenAI call surfaces as a retry/failure
+# here instead of a 502 on the chat side while this call keeps running.
+GENERATION_TIMEOUT_S = 20.0
+GENERATION_MAX_RETRIES = 2
 SYSTEM = (pathlib.Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md").read_text("utf-8")
 URL_IN_TEXT = re.compile(r"\S*(?:https?://|www\.|abb-bank\.az)\S*")
 
@@ -53,7 +58,11 @@ class Completion(Protocol):
 
 class OpenAIClient:
     def __init__(self) -> None:
-        self._c = OpenAI(api_key=settings.openai_api_key)
+        self._c = OpenAI(
+            api_key=settings.openai_api_key,
+            timeout=GENERATION_TIMEOUT_S,
+            max_retries=GENERATION_MAX_RETRIES,
+        )
         # The eval runner stamps the report's config line with
         # `getattr(client, "model", "mock")`. Without this attribute a real,
         # paid run reports itself as `"model": "mock"` -- which reads to a
