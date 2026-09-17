@@ -175,7 +175,7 @@ appears if some rows were updated against the shipping corpus (30/43 matches
 `evals/report.md`'s committed hit@5 of 0.698 exactly) while the table and
 Consequences prose elsewhere were not.
 
-**Change.** `scripts/ablate_retrieval.py`, which imports `retrieval.py`'s own
+**Change.** `evals/ablate_retrieval.py`, which imports `retrieval.py`'s own
 `DENSE_DOCS`, `FTS_DOCS`, `TRGM_DOCS`, `_rrf`, `_tsquery`, `_fold` and
 `RANK_DEPTH` (never modifying that module) and re-runs items 1, 2 and 4 — the
 retrieval-only questions, no generation involved — as isolated per-leg SQL
@@ -236,7 +236,7 @@ measured was about to be retired.
 **Change.** `data/corpus_sample.json` replaced with
 `data/corpus_20260915T151437Z.json` (280 documents, 736 chunks,
 `corpus_id = 90e08090d30552fc939ea2c78e8c6248a7aa87af1970906b2dcdd0e78898fde9`).
-`scripts/ablate_retrieval.py` re-run against `90e08090…`; `evals/report.md`
+`evals/ablate_retrieval.py` re-run against `90e08090…`; `evals/report.md`
 regenerated against it. No re-ingest was needed — `90e08090…` was already `ready`
 in `rag.corpora`, confirmed by a no-op run of `scripts/ingest_fixture.py` that
 returned the corpus id immediately with no embedding calls logged.
