@@ -229,3 +229,57 @@ def test_stage_transition_to_embedding_is_committed_before_embed_runs(db: Any) -
     ingest_corpus(c, observer)
 
     assert observer.observed_stage == "embedding"
+
+
+def test_concurrent_duplicate_ingest_does_not_clobber_the_winner(
+    db: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """final-code-review finding 5: two concurrent uploads for the same NEW
+    corpus can both pass ingest_corpus's "does a row already exist" check
+    before either commits its own INSERT. Only one INSERT can win the
+    (content_hash, embedding_model) unique constraint (001_schema.sql); the
+    loser must back off, not raise -- otherwise the exception reaches _run's
+    except handler, whose failure UPDATE is keyed on the same
+    (content_hash, embedding_model) pair and would mark the WINNER's row
+    'failed' even though it's ready.
+
+    Reproduces the interleaving deterministically (no thread timing): the
+    moment ingest_corpus's own existing-row SELECT returns empty, a second
+    connection commits a competing 'ready' row -- exactly what ingest_corpus
+    would see if a concurrent request's INSERT had won a moment earlier.
+    """
+    c = corpus(1)
+    embedder = FakeEmbedder(dim=8)
+    real_execute = psycopg.Connection.execute
+    planted = False
+
+    def racy_execute(self: psycopg.Connection, query: Any, params: Any = None, **kw: Any) -> Any:
+        nonlocal planted
+        cursor = real_execute(self, query, params, **kw)
+        if (
+            not planted
+            and isinstance(query, str)
+            and "SELECT id, status, now() - updated_at" in query
+        ):
+            planted = True
+            with db_module.pool.connection() as winner_conn:
+                winner_conn.execute(
+                    "INSERT INTO rag.corpora (id, content_hash, manifest, status, stage, "
+                    "embedding_model, embedding_version) VALUES "
+                    "(gen_random_uuid(), %s, '{}', 'ready', 'ready', %s, 1)",
+                    (c.corpus_id, embedder.model),
+                )
+                winner_conn.commit()
+        return cursor
+
+    monkeypatch.setattr(psycopg.Connection, "execute", racy_execute)
+
+    result = ingest_corpus(c, embedder)
+
+    assert result == c.corpus_id
+    rows = db.execute(
+        "SELECT status FROM rag.corpora WHERE content_hash = %s AND embedding_model = %s",
+        (c.corpus_id, embedder.model),
+    ).fetchall()
+    assert rows == [("ready",)]  # the winner's row survives, untouched
+    assert db.execute("SELECT count(*) FROM rag.documents").fetchone()[0] == 0
